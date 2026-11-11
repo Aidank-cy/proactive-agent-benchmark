@@ -173,6 +173,10 @@ def test_isolation_integrity_and_replay(tmp_path):
     world.replay(records)
     assert world.snapshot() == final
     assert world.history() == records
+    before = world.snapshot()
+    world.record_mcp_action(1, "2026-01-01T00:00:02+00:00", "kv.delete", {"key": "item"}, None, False, "denied", {}, before, before)
+    assert world.mcp_actions(1)[0]["success"] is False
+    assert world.mcp_actions(1)[0]["error"] == "denied"
     world.close()
 
 

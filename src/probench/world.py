@@ -47,7 +47,9 @@ class SQLiteWorld:
         self.adapters = adapters
         self.initial = copy.deepcopy(initial)
         self.conn.execute("CREATE TABLE IF NOT EXISTS state (adapter TEXT PRIMARY KEY, data TEXT NOT NULL)")
-        self.conn.execute("CREATE TABLE IF NOT EXISTS history (seq INTEGER PRIMARY KEY, at TEXT, source TEXT, adapter TEXT, operation TEXT, arguments TEXT, result TEXT, changes TEXT)")
+        self.conn.execute("CREATE TABLE IF NOT EXISTS history (seq INTEGER PRIMARY KEY, at TEXT, source TEXT, adapter TEXT, operation TEXT, arguments TEXT, result TEXT, changes TEXT, world_before TEXT, world_after TEXT)")
+        self.conn.execute("CREATE TABLE IF NOT EXISTS notifications (seq INTEGER PRIMARY KEY, turn_id INTEGER, at TEXT, text TEXT, opportunity_id TEXT)")
+        self.conn.execute("CREATE TABLE IF NOT EXISTS mcp_actions (seq INTEGER PRIMARY KEY, turn_id INTEGER, at TEXT, tool TEXT, arguments TEXT, result TEXT, success INTEGER, error TEXT, changes TEXT, world_before TEXT, world_after TEXT)")
         if not self.conn.execute("SELECT 1 FROM state LIMIT 1").fetchone():
             for name, data in initial.items():
                 if name not in adapters or not isinstance(data, dict):
@@ -61,21 +63,38 @@ class SQLiteWorld:
     def execute(self, adapter, operation, arguments, *, mutate, source, timestamp):
         if adapter not in self.adapters:
             raise ValueError(f"unknown adapter: {adapter}")
-        state = self.snapshot().get(adapter, {})
+        world_before = self.snapshot()
+        state = world_before.get(adapter, {})
         result, changes = self.adapters[adapter].execute(state, operation, arguments, mutate=mutate)
         if mutate:
             with self.conn:
                 self.conn.execute("INSERT OR REPLACE INTO state VALUES (?,?)", (adapter, json.dumps(state)))
         with self.conn:
-            self.conn.execute("INSERT INTO history (at,source,adapter,operation,arguments,result,changes) VALUES (?,?,?,?,?,?,?)", (timestamp, source, adapter, operation, json.dumps(arguments), json.dumps(result), json.dumps(changes)))
+            self.conn.execute("INSERT INTO history (at,source,adapter,operation,arguments,result,changes,world_before,world_after) VALUES (?,?,?,?,?,?,?,?,?)", (timestamp, source, adapter, operation, json.dumps(arguments), json.dumps(result), json.dumps(changes), json.dumps(world_before), json.dumps(self.snapshot())))
         return result, changes
 
     def history(self):
-        return [dict(seq=r[0], at=r[1], source=r[2], adapter=r[3], operation=r[4], arguments=json.loads(r[5]), result=json.loads(r[6]), changes=json.loads(r[7])) for r in self.conn.execute("SELECT * FROM history ORDER BY seq")]
+        return [dict(seq=r[0], at=r[1], source=r[2], adapter=r[3], operation=r[4], arguments=json.loads(r[5]), result=json.loads(r[6]), changes=json.loads(r[7]), world_before=json.loads(r[8]), world_after=json.loads(r[9])) for r in self.conn.execute("SELECT * FROM history ORDER BY seq")]
+
+    def notify(self, turn_id: int, timestamp: str, content: str, opportunity_id: str | None):
+        with self.conn:
+            self.conn.execute("INSERT INTO notifications (turn_id,at,text,opportunity_id) VALUES (?,?,?,?)", (turn_id, timestamp, content, opportunity_id))
+
+    def notifications(self, turn_id: int):
+        return [dict(seq=r[0], timestamp=r[1], text=r[2], opportunity_id=r[3]) for r in self.conn.execute("SELECT seq,at,text,opportunity_id FROM notifications WHERE turn_id=? ORDER BY seq", (turn_id,))]
+
+    def record_mcp_action(self, turn_id: int, timestamp: str, tool: str, arguments: dict[str, Any], result: Any, success: bool, error: str | None, changes: dict[str, Any], before: dict[str, Any], after: dict[str, Any]):
+        with self.conn:
+            self.conn.execute("INSERT INTO mcp_actions (turn_id,at,tool,arguments,result,success,error,changes,world_before,world_after) VALUES (?,?,?,?,?,?,?,?,?,?)", (turn_id, timestamp, tool, json.dumps(arguments), json.dumps(result), int(success), error, json.dumps(changes), json.dumps(before), json.dumps(after)))
+
+    def mcp_actions(self, turn_id: int):
+        return [dict(seq=i, tool=r[0], arguments=json.loads(r[1]), result=json.loads(r[2]), success=bool(r[3]), error=r[4], changes=json.loads(r[5]), world_before=json.loads(r[6]), world_after=json.loads(r[7]), simulated_timestamp=r[8]) for i, r in enumerate(self.conn.execute("SELECT tool,arguments,result,success,error,changes,world_before,world_after,at FROM mcp_actions WHERE turn_id=? ORDER BY seq", (turn_id,)), 1)]
 
     def reset(self):
         with self.conn:
             self.conn.execute("DELETE FROM history")
+            self.conn.execute("DELETE FROM notifications")
+            self.conn.execute("DELETE FROM mcp_actions")
             self.conn.execute("DELETE FROM state")
             for name, data in self.initial.items():
                 self.conn.execute("INSERT INTO state VALUES (?,?)", (name, json.dumps(data)))

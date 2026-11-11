@@ -6,5 +6,7 @@ __pycache__/
 runs/
 *.db
 .env
+.env.*
+!.env.example
 *.log
 

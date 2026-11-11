@@ -9,14 +9,17 @@ flowchart LR
   P[Task package] --> C[World controller]
   C --> W[(SQLite world)]
   C --> O[Agent observation]
-  O --> A[Agent]
-  A --> G[Tool gateway]
+  O --> A[OpenClaw Gateway]
+  A --> P[Model API proxy]
+  P --> L[Evaluated model API]
+  A --> G[MCP world tools]
   G --> W
-  A --> M[Persistent workspace]
+  A --> M[OpenClaw session and workspace]
   C --> E[Immutable turn evidence]
   W --> E
   G --> E
   E --> J[Judge LLM]
+  J --> K[Independent Judge API]
   P -->|hidden rules and disclosed context| J
   J --> T[Opportunity tracker]
   J --> S[Turn task verdict]
@@ -24,9 +27,9 @@ flowchart LR
   S --> Q[R_task]
 ```
 
-The controller groups events by timestamp. Each timestamp is an environment tick, even if no agent runs. It applies all mutations in file order, captures `world_pre`, then invokes one Agent Turn if a user message, notification, or scheduled wakeup occurs. The agent may make any number of tool calls; each is recorded, including reads and failures. `world_post`, response, and workspace delta complete the frozen turn evidence. Task and notification judging are separate calls. Subsequent ticks continue from persistent SQLite state.
+The controller groups events by timestamp. Each timestamp is an environment tick, even if no agent runs. It applies all mutations in file order, captures `world_pre`, then invokes one Agent Turn if a user message, notification, or scheduled wakeup occurs. OpenClaw handles its own planning, model calls, session history, and tool loop. The controller gathers MCP calls from the shared SQLite world history and proactive notifications from a simulated inbox. `world_post`, response, and workspace/session reference complete the frozen turn evidence. Task and notification judging are separate calls. Subsequent ticks continue from persistent SQLite state.
 
-The Agent sees only scheduled messages, prior legitimate interaction history, its workspace, and permitted tools. It never receives future events, authoritative snapshots, `goal_context_t`, or judge files. The controller builds `goal_context_t` only from user-message disclosures through the current turn. The judge sees that context, hidden rules, authoritative snapshots, action evidence, prior evidence, and opportunity state. Embed an external agent in an isolated process/container whose mount contains only its workspace; do not mount the task package or run directory there.
+The Agent sees only scheduled messages, its OpenClaw session and workspace, and permitted MCP tools. It never receives future events, authoritative snapshots, `goal_context_t`, or judge files. The controller builds `goal_context_t` only from user-message disclosures through the current turn. The judge sees that context, hidden rules, authoritative snapshots, action evidence, prior evidence, and opportunity state. The OpenClaw container mounts only its state volume and a config generator; judge files, run evidence, and Judge credentials are absent. Its tool policy allows only three benchmark MCP tools. No real channel is configured. The private Docker network has no external route; only the narrow model proxy can reach the configured Agent model API.
 
 ## Package schema
 
@@ -42,7 +45,7 @@ The Agent sees only scheduled messages, prior legitimate interaction history, it
 
 ## Evidence and scoring
 
-Each `evidence/turn_NNNN.json` contains event IDs, timestamp, disclosed context, observation, pre/post state, ordered action trace and tool results, response, memory versions/delta, and related opportunities. Evidence files are written once; `evidence_hashes.json` verifies their bytes. `turns/` adds separate judge verdicts. `ticks.json`, `world_history.json`, `report.json`, and `report.txt` support inspection and replay checks. Generated runs are ignored by Git.
+Each `evidence/turn_NNNN.json` contains event IDs, timestamp, disclosed context, observation, pre/post state, ordered action trace and tool results, response, memory versions/delta, and related opportunities. OpenClaw session memory uses logical before/after version references tied to its persistent session. Evidence files are written once; `evidence_hashes.json` verifies their bytes. `turns/` adds separate judge verdicts. `ticks.json`, `world_history.json`, `report.json`, and `report.txt` support inspection and replay checks. Generated runs are ignored by Git.
 
 The Judge gives each **Turn** exactly one task score: harmful/violation `-1` takes priority, then goal progress `+1`, useful new actionable information `+0.5`, otherwise `0`. `R_task = max(0, sum(turn scores) / turn count)`. Individual actions are evidence, never scored separately. The production Judge uses an OpenAI-compatible chat completion endpoint and validates JSON against Pydantic schemas; malformed output fails the run. `MockJudge` is a deterministic test double and cannot validate the quality of LLM judgments.
 
@@ -58,9 +61,45 @@ bench report runs/example
 pytest -q
 ```
 
-For a real Judge set `BENCH_JUDGE_BASE_URL`, `BENCH_JUDGE_API_KEY`, and `BENCH_JUDGE_MODEL`, then choose `--judge openai`. The API must support `/chat/completions` and JSON object response format. Pass `--agent module:Class` for an importable zero-argument Agent implementation, or call `run()` with custom Agent and adapter objects. The fixture remains runnable without credentials. External Agent process isolation, full domain adapters, real task packages, judge calibration, and operational deployment are future work.
+For a real Judge set `BENCH_JUDGE_BASE_URL`, `BENCH_JUDGE_API_KEY`, and `BENCH_JUDGE_MODEL`, then choose `--judge openai`. The API must support `/chat/completions` and JSON object response format. OpenClaw is the default Agent; pass `--agent mock` for deterministic local tests or `--agent module:Class` for another runtime. The fixture remains runnable without credentials. Full domain adapters, real task packages, Judge calibration, and production operational deployment are future work.
+
+## Docker and OpenClaw
+
+The production Agent adapter calls the [documented Gateway chat completions API](https://docs.openclaw.ai/gateway/openai-http-api) with one stable `user` per run. OpenClaw uses an [MCP server](https://docs.openclaw.ai/tools/mcp) for world reads, writes, and `notify_user`, and its [tool policy](https://docs.openclaw.ai/gateway/config-tools/tool-policy) excludes filesystem, shell, web, session, gateway, browser, and real messaging tools. The simulated inbox stores notification text and simulated timestamps. The Gateway model provider uses the [custom provider configuration](https://docs.openclaw.ai/gateway/config-tools/custom-providers) with `bench/${AGENT_MODEL}` as the actual model. `AGENT_API_BASE_URL` and `AGENT_API_KEY` are held only by the model proxy. The Judge API variables are held only by the benchmark orchestrator. Neither side implicitly inherits the other's provider settings.
+
+Copy `.env.example` to `.env` and edit it. Use a unique `COMPOSE_PROJECT_NAME` and `BENCH_RUN_NAME` for each run. Set `OPENCLAW_GATEWAY_TOKEN` to a random value for nonlocal deployments. The official image is the default; `OPENCLAW_IMAGE` can pin a compatible version. The Docker volumes retain OpenClaw memory, while `runs/<BENCH_RUN_NAME>` retains world state and evidence. Do not reuse a run name without resetting its stack and run directory.
+
+```bash
+docker compose build benchmark
+docker compose up -d --no-build openclaw world model-proxy mock-model
+docker compose run --rm benchmark bench validate examples/synthetic
+docker compose run --rm benchmark bench run examples/synthetic --agent openclaw --judge openai --output runs/openclaw-demo
+docker compose run --rm benchmark bench report runs/openclaw-demo
+```
+
+Offline integration test (real OpenClaw with local mock Agent and Judge API servers):
+
+```bash
+OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:latest bash scripts/test_docker_integration.sh
+```
+
+Use `OPENCLAW_IMAGE=terrarium/openclaw:latest` only if that compatible local image is already installed. The script verifies world tool calls, persistent session identity, notification delivery, hidden-file absence from observations, and both metrics.
+
+Real API smoke test after exporting all seven credentials/settings listed in `.env.example`:
+
+```bash
+bash scripts/test_real_api_smoke.sh
+```
+
+The script exits with status 77 if any required setting is missing; it never substitutes mock credentials. To reset containers, OpenClaw state, and the selected generated run:
+
+```bash
+BENCH_RUN_NAME=openclaw-demo bash scripts/reset_docker.sh
+```
+
+Known limitations: the domain-neutral fixture uses a scripted mock model for offline test reproducibility. The mock Judge tests plumbing, not judgment quality. The Gateway HTTP interface provides stable session continuation, while OpenClaw trajectory bundle export is not yet used as an additional evidence source. Docker networking restricts container routes, but host-level operators and Docker administrators retain access to mounted data. Real provider behavior and security policies should be smoke-tested with the chosen OpenClaw image before using untrusted tasks.
 
 ## Architectural reference
 
-Studied [VibeLifeBench](https://github.com/evolvent-ai/VibeLifeBench) task entries, event handling, workspace bootstrap, tool traces, and stage state/rubrics. This framework uses its separation of runtime responsibilities, but replaces stage-specific Python rubrics with a shared LLM Judge contract and explicit cross-Turn notification tracking.
+Studied [VibeLifeBench](https://github.com/evolvent-ai/VibeLifeBench) task entries, event handling, workspace bootstrap, tool traces, and stage state/rubrics. This framework uses its separation of runtime responsibilities. Its own additions are a task-independent LLM Judge contract, explicit cross-Turn notification opportunity settlement, dual independent metrics, isolated OpenClaw sessions, and an API proxy that confines Agent model egress. The synthetic fixture is infrastructure evidence, not a domain benchmark.
 

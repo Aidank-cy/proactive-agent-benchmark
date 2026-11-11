@@ -1,0 +1,91 @@
+services:
+  benchmark:
+    image: probench:local
+    build: .
+    environment:
+      OPENCLAW_GATEWAY_URL: http://openclaw:18789
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-local-benchmark-token}
+      AGENT_API_BASE_URL: ${AGENT_API_BASE_URL:-http://mock-model:8001/v1}
+      AGENT_MODEL: ${AGENT_MODEL:-fixture-model}
+      AGENT_TEMPERATURE: ${AGENT_TEMPERATURE:-0}
+      AGENT_CONTEXT_WINDOW: ${AGENT_CONTEXT_WINDOW:-128000}
+      BENCH_JUDGE_BASE_URL: ${BENCH_JUDGE_BASE_URL:-http://mock-model:8001/v1}
+      BENCH_JUDGE_API_KEY: ${BENCH_JUDGE_API_KEY:-offline-test-key}
+      BENCH_JUDGE_MODEL: ${BENCH_JUDGE_MODEL:-fixture-judge}
+      BENCH_RUN_NAME: ${BENCH_RUN_NAME:-openclaw-demo}
+      PYTHONPATH: /app/src
+    volumes:
+      - ./runs:/app/runs
+      - ./examples:/app/examples:ro
+      - ./src:/app/src:ro
+    networks: [agent_private, judge_egress]
+    depends_on: [openclaw, world, model-proxy]
+  openclaw:
+    image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:latest}
+    entrypoint: ["sh", "-lc"]
+    command: ["node /opt/bench/openclaw-config.mjs && exec openclaw gateway --bind lan --port 18789"]
+    environment:
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      OPENCLAW_CONFIG_PATH: /home/node/.openclaw/openclaw.json
+      OPENCLAW_WORKSPACE_DIR: /home/node/.openclaw/workspace/${BENCH_RUN_NAME:-openclaw-demo}
+      OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN:-local-benchmark-token}
+      AGENT_MODEL: ${AGENT_MODEL:-fixture-model}
+      AGENT_TEMPERATURE: ${AGENT_TEMPERATURE:-0}
+      AGENT_CONTEXT_WINDOW: ${AGENT_CONTEXT_WINDOW:-128000}
+      BENCH_RUN_NAME: ${BENCH_RUN_NAME:-openclaw-demo}
+    volumes:
+      - openclaw_state:/home/node/.openclaw
+      - ./docker/openclaw-config.mjs:/opt/bench/openclaw-config.mjs:ro
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    networks: [agent_private]
+  world:
+    image: probench:local
+    command: ["python", "-m", "probench.world_mcp"]
+    environment:
+      BENCH_RUN_NAME: ${BENCH_RUN_NAME:-openclaw-demo}
+      BENCH_RUNS_ROOT: /app/runs
+      PYTHONPATH: /app/src
+    volumes:
+      - ./runs:/app/runs
+      - ./src:/app/src:ro
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    networks: [agent_private]
+  model-proxy:
+    image: probench:local
+    command: ["python", "-m", "probench.model_proxy"]
+    environment:
+      AGENT_API_BASE_URL: ${AGENT_API_BASE_URL:-http://mock-model:8001/v1}
+      AGENT_API_KEY: ${AGENT_API_KEY:-offline-test-key}
+      PYTHONPATH: /app/src
+    volumes:
+      - ./src:/app/src:ro
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    networks: [agent_private, model_egress]
+  mock-model:
+    image: probench:local
+    command: ["python", "-m", "probench.mock_model_api"]
+    environment:
+      PYTHONPATH: /app/src
+    volumes:
+      - ./src:/app/src:ro
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    networks: [model_egress, judge_egress]
+networks:
+  agent_private:
+    internal: true
+  model_egress: {}
+  judge_egress: {}
+volumes:
+  openclaw_state: {}

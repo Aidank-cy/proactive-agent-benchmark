@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .agent import MockAgent
 from .judge import MockJudge, OpenAICompatibleJudge
+from .openclaw_agent import OpenClawAgent
 from .runtime import run, verify_evidence
 from .schema import load_task
 
@@ -18,8 +19,8 @@ def main():
     validate.add_argument("task_path")
     execute = commands.add_parser("run")
     execute.add_argument("task_path")
-    execute.add_argument("--agent", default="mock", help="mock or importable module:Class implementing run_turn")
-    execute.add_argument("--judge", default="mock", choices=["mock", "openai"])
+    execute.add_argument("--agent", default="openclaw", help="openclaw, mock, or importable module:Class implementing run_turn")
+    execute.add_argument("--judge", default="openai", choices=["mock", "openai"])
     execute.add_argument("--output", default="runs/example")
     report = commands.add_parser("report")
     report.add_argument("run_directory")
@@ -29,13 +30,15 @@ def main():
         print(f"Valid: {task.manifest.task_id} ({len(task.events)} events)")
     elif args.command == "run":
         task = load_task(args.task_path)
-        if args.agent == "mock":
+        if args.agent == "openclaw":
+            agent = OpenClawAgent()
+        elif args.agent == "mock":
             script = json.loads((task.root / "mock_agent.json").read_text(encoding="utf-8"))
             agent = MockAgent(script)
         else:
             module_name, separator, class_name = args.agent.partition(":")
             if not separator:
-                parser.error("--agent must be mock or module:Class")
+                parser.error("--agent must be openclaw, mock, or module:Class")
             agent = getattr(importlib.import_module(module_name), class_name)()
         result = run(task, agent, MockJudge() if args.judge == "mock" else OpenAICompatibleJudge(), Path(args.output))
         print(json.dumps({"R_task": result["R_task"], "R_notify": result["R_notify"]}, indent=2))

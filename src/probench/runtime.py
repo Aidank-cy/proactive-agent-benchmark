@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
@@ -38,6 +39,9 @@ def run(task: TaskPackage, agent: Agent, judge: Judge, run_dir: Path, adapters: 
         raise ValueError("missing domain adapter")
     world = SQLiteWorld(run_dir / "world.db", task.initial_world, adapters)
     workspace = Workspace(run_dir / "agent_workspace", task.manifest.workspace_files)
+    if hasattr(agent, "start_run"):
+        agent.start_run(task, run_dir)
+    _json(run_dir / "run_metadata.json", {"task_id": task.manifest.task_id, "agent_runtime": type(agent).__name__, "agent_model": os.environ.get("AGENT_MODEL") if getattr(agent, "external_tools", False) else None, "agent_provider_base_url": os.environ.get("AGENT_API_BASE_URL") if getattr(agent, "external_tools", False) else None, "agent_inference_parameters": {"temperature": os.environ.get("AGENT_TEMPERATURE", "0"), "context_window": os.environ.get("AGENT_CONTEXT_WINDOW", "128000")} if getattr(agent, "external_tools", False) else None, "judge_runtime": type(judge).__name__, "judge_model": os.environ.get("BENCH_JUDGE_MODEL") if type(judge).__name__ == "OpenAICompatibleJudge" else None, "judge_provider_base_url": os.environ.get("BENCH_JUDGE_BASE_URL") if type(judge).__name__ == "OpenAICompatibleJudge" else None, "judge_temperature": 0 if type(judge).__name__ == "OpenAICompatibleJudge" else None})
     tracker = OpportunityTracker(task.manifest.task_id)
     grouped = defaultdict(list)
     for event in task.events:
@@ -83,12 +87,17 @@ def run(task: TaskPackage, agent: Agent, judge: Judge, run_dir: Path, adapters: 
             memory_before = workspace.snapshot()
             observation = {"timestamp": timestamp, "messages": [{"event_id": e.id, "kind": e.kind, "body": e.body} for e in wake_events]}
             gateway = ToolGateway(world, workspace, timestamp, task.manifest.tool_permissions)
+            if hasattr(agent, "start_turn"):
+                agent.start_turn(turn_id, timestamp, task.manifest.tool_permissions)
             response = agent.run_turn(observation, gateway, [{"observation": x["agent_observation"], "action_trace": x["action_trace"], "response": x["agent_response"]} for x in turns])
             if not isinstance(response, dict) or not isinstance(response.get("proactive_notifications", []), list):
                 raise ValueError("agent must return response dict with proactive_notifications list")
             response.setdefault("proactive_notifications", [])
+            if getattr(agent, "external_tools", False):
+                gateway.trace = world.mcp_actions(turn_id)
+                response["proactive_notifications"] = world.notifications(turn_id)
             after_memory = workspace.snapshot()
-            evidence = {"task_id": task.manifest.task_id, "turn_id": turn_id, "tick_id": tick_number, "simulated_timestamp": timestamp, "triggering_events": [{"id": e.id, "kind": e.kind, "at": e.at.isoformat()} for e in pending_events], "goal_context_t": task.goal_context(disclosed), "agent_observation": observation, "world_pre": pre, "action_trace": gateway.trace, "tool_results": [a["result"] for a in gateway.trace], "agent_response": response, "memory_before": memory_before, "memory_delta": {k: v for k, v in after_memory.items() if memory_before.get(k) != v}, "world_post": world.snapshot(), "related_opportunities": [x["opportunity_id"] for x in tracker.active()], "event_mutations": event_results}
+            evidence = {"task_id": task.manifest.task_id, "turn_id": turn_id, "tick_id": tick_number, "simulated_timestamp": timestamp, "triggering_events": [{"id": e.id, "kind": e.kind, "at": e.at.isoformat()} for e in pending_events], "goal_context_t": task.goal_context(disclosed), "agent_observation": observation, "world_pre": pre, "action_trace": gateway.trace, "tool_results": [a["result"] for a in gateway.trace], "agent_response": response, "memory_before": memory_before, "memory_delta": {k: v for k, v in after_memory.items() if memory_before.get(k) != v}, "agent_session_reference": getattr(agent, "session_key", None), "agent_memory_version_before": f"{agent.session_key}:turn:{turn_id - 1}" if getattr(agent, "external_tools", False) else None, "agent_memory_version_after": f"{agent.session_key}:turn:{turn_id}" if getattr(agent, "external_tools", False) else None, "world_post": world.snapshot(), "related_opportunities": [x["opportunity_id"] for x in tracker.active()], "event_mutations": event_results}
             name = f"evidence/turn_{turn_id:04d}.json"
             _json(run_dir / name, evidence)
             hashes[name] = hashlib.sha256((run_dir / name).read_bytes()).hexdigest()
@@ -135,4 +144,6 @@ def run(task: TaskPackage, agent: Agent, judge: Judge, run_dir: Path, adapters: 
         return metrics
     finally:
         world.close()
+        if hasattr(agent, "shutdown"):
+            agent.shutdown()
 
