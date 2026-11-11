@@ -38,6 +38,8 @@ def run(task: TaskPackage, agent: Agent, judge: Judge, run_dir: Path, adapters: 
     if any(binding.id not in adapters for binding in task.manifest.bindings()):
         raise ValueError("missing domain adapter")
     world = SQLiteWorld(run_dir / "world.db", task.initial_world, adapters)
+    if hasattr(judge, "configure"):
+        judge.configure(task, run_dir, world.history)
     workspace = Workspace(run_dir / "agent_workspace", task.manifest.workspace_files)
     if hasattr(agent, "start_run"):
         agent.start_run(task, run_dir)
@@ -71,7 +73,7 @@ def run(task: TaskPackage, agent: Agent, judge: Judge, run_dir: Path, adapters: 
                 tick["notification_judge"] = tick_verdict.model_dump()
                 for proposal in tick_verdict.new_opportunities:
                     rule = next((r for r in task.rules if r.id == proposal.rule_id), None)
-                    if rule is None or proposal.trigger_event_id not in {e.id for e in events} or proposal.trigger_event_id not in rule.trigger_event_ids:
+                    if rule is None or proposal.trigger_event_id not in {e.id for e in events} or (rule.trigger_event_ids and proposal.trigger_event_id not in rule.trigger_event_ids):
                         raise ValueError("judge proposed unknown rule or trigger event")
                     tracker.create(rule, proposal.trigger_event_id, timestamp)
                 for settlement in tick_verdict.settled:
@@ -101,20 +103,23 @@ def run(task: TaskPackage, agent: Agent, judge: Judge, run_dir: Path, adapters: 
             name = f"evidence/turn_{turn_id:04d}.json"
             _json(run_dir / name, evidence)
             hashes[name] = hashlib.sha256((run_dir / name).read_bytes()).hexdigest()
-            for item in tracker.active():
-                if datetime.fromisoformat(timestamp) > datetime.fromisoformat(item["notification_deadline"]):
-                    tracker.settle(item["opportunity_id"], "EXPIRED", 0, timestamp, "Notification deadline passed.", ["tick:clock"])
-            had_active_obligation = bool(tracker.active())
+            had_active_obligation = any(datetime.fromisoformat(timestamp) <= datetime.fromisoformat(item["notification_deadline"]) for item in tracker.active())
             previous = [{k: v for k, v in t.items() if k != "judge_result"} for t in turns]
             task_result = judge.task(evidence, task.rules, previous, tracker.values())
             notification_result = judge.notification(evidence, task.rules, tracker.values(), previous)
             for proposal in notification_result.new_opportunities:
                 rule = next((r for r in task.rules if r.id == proposal.rule_id), None)
                 event = next((e for e in pending_events if e.id == proposal.trigger_event_id), None)
-                if rule is None or event is None or proposal.trigger_event_id not in rule.trigger_event_ids:
+                if rule is None or event is None or (rule.trigger_event_ids and proposal.trigger_event_id not in rule.trigger_event_ids):
                     raise ValueError("judge proposed unknown rule or trigger event")
                 tracker.create(rule, proposal.trigger_event_id, event.at.isoformat())
             for settlement in notification_result.settled:
+                opportunity = next((item for item in tracker.values() if item["opportunity_id"] == settlement.opportunity_id), None)
+                if opportunity is not None and settlement.status == "NOTIFIED" and settlement.score is not None and settlement.score >= 0 and datetime.fromisoformat(timestamp) > datetime.fromisoformat(opportunity["notification_deadline"]):
+                    settlement.status = "EXPIRED"
+                    settlement.score = 0
+                    settlement.reason = "Notification arrived after the allowed deadline."
+                    notification_result.false_notifications.append(f"Late notification for {settlement.opportunity_id}")
                 tracker.settle(settlement.opportunity_id, settlement.status, settlement.score, timestamp, settlement.reason, settlement.evidence_refs)
             for item in tracker.active():
                 if datetime.fromisoformat(timestamp) > datetime.fromisoformat(item["notification_deadline"]):

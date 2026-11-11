@@ -17,7 +17,7 @@ if [[ "${BENCH_SKIP_BUILD:-0}" != "1" ]]; then
   docker compose build benchmark
 fi
 docker compose up -d --no-build openclaw world model-proxy mock-model
-docker compose run --rm benchmark pytest -q tests/test_services.py
+docker compose run --rm benchmark pytest -q tests/test_services.py tests/test_judge_evidence.py
 docker compose run --rm benchmark bench run examples/synthetic --agent openclaw --judge openai --output "runs/${BENCH_RUN_NAME}"
 docker compose run --rm benchmark bench report "runs/${BENCH_RUN_NAME}"
 python3 - "runs/${BENCH_RUN_NAME}" <<'PY'

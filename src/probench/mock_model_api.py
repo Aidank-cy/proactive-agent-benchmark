@@ -58,10 +58,10 @@ class Handler(BaseHTTPRequestHandler):
         if body.get("model") == "fixture-judge":
             request = json.loads(_text(body["messages"][-1]))
             judge = MockJudge()
-            if "Judge task execution" in _text(body["messages"][0]):
-                verdict = judge.task(request["evidence"], [NotificationRule.model_validate(x) for x in request["hidden_rules"]], request["previous_evidence"], request["opportunities"])
+            if "JUDGE_REQUEST_KIND: task execution" in _text(body["messages"][0]):
+                verdict = judge.task(request["evidence"], [NotificationRule.model_validate(x) for x in request["hidden_rules"]], request.get("previous_evidence", []), request.get("opportunities", []))
             else:
-                verdict = judge.notification(request["evidence"], [NotificationRule.model_validate(x) for x in request["hidden_rules"]], request["opportunities"], request.get("previous_evidence", []))
+                verdict = judge.notification(request["evidence"], [NotificationRule.model_validate(x) for x in request["hidden_rules"]], request.get("opportunities", []), request.get("previous_evidence", []))
             message, finish = {"role": "assistant", "content": verdict.model_dump_json()}, "stop"
         else:
             message, finish = _agent_reply(body)

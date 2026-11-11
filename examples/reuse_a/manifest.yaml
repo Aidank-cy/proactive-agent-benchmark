@@ -12,3 +12,5 @@ initial_world: initial_world.yaml
 events: events.yaml
 context: context.yaml
 notification_rules: judge/notification_rules.yaml
+judge_instructions: judge/instructions.md
+evidence_sources: judge/evidence_sources.yaml

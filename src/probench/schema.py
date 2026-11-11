@@ -10,6 +10,7 @@ import yaml
 from pydantic import BaseModel, Field, PrivateAttr, field_validator, model_validator
 
 from .services import DEFAULT_REGISTRY, DomainAdapter, ServiceRegistry, load_service_modules
+from .judge_evidence import EvidenceSources
 
 
 def aware(value: datetime) -> datetime:
@@ -49,6 +50,8 @@ class Manifest(BaseModel):
     events: str = "events.yaml"
     context: str = "context.yaml"
     notification_rules: str = "judge/notification_rules.yaml"
+    judge_instructions: str | None = None
+    evidence_sources: str | None = None
 
     _timestamp = field_validator("initial_timestamp")(aware)
 
@@ -106,12 +109,15 @@ class TaskPackage(BaseModel):
     events: list[Event]
     context: list[ContextDisclosure]
     rules: list[NotificationRule]
+    judge_instructions: str = ""
+    judge_evidence_sources: EvidenceSources = Field(default_factory=EvidenceSources)
 
     def service_adapters(self) -> dict[str, DomainAdapter]:
         return {binding.id: self._registry.create(binding.service, binding.config) for binding in self.manifest.bindings()}
 
     def goal_context(self, disclosed_event_ids: set[str]) -> dict[str, Any]:
-        rows = [c.model_dump() for c in self.context if c.event_id in disclosed_event_ids]
+        event_order = {event.id: index for index, event in enumerate(self.events)}
+        rows = [c.model_dump() for c in sorted(self.context, key=lambda row: event_order[row.event_id]) if c.event_id in disclosed_event_ids]
         return {"disclosures": rows}
 
 
@@ -119,6 +125,20 @@ def _read(root: Path, relative: str) -> Any:
     path = (root / relative).resolve()
     if not path.is_relative_to(root.resolve()):
         raise ValueError(f"path escapes task root: {relative}")
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def _read_text(root: Path, relative: str) -> str:
+    path = (root / relative).resolve()
+    if not path.is_relative_to((root / "judge").resolve()):
+        raise ValueError(f"Judge file must be inside task judge directory: {relative}")
+    return path.read_text(encoding="utf-8")
+
+
+def _read_judge_yaml(root: Path, relative: str) -> Any:
+    path = (root / relative).resolve()
+    if not path.is_relative_to((root / "judge").resolve()):
+        raise ValueError(f"Judge file must be inside task judge directory: {relative}")
     return yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
@@ -131,6 +151,8 @@ def load_task(path: str | Path, registry: ServiceRegistry = DEFAULT_REGISTRY) ->
     events = [Event.model_validate(x) for x in (_read(root, manifest.events) or [])]
     contexts = [ContextDisclosure.model_validate(x) for x in (_read(root, manifest.context) or [])]
     rules = [NotificationRule.model_validate(x) for x in (_read(root, manifest.notification_rules) or [])]
+    instructions = _read_text(root, manifest.judge_instructions) if manifest.judge_instructions else ""
+    evidence_sources = EvidenceSources.model_validate(_read_judge_yaml(root, manifest.evidence_sources)) if manifest.evidence_sources else EvidenceSources()
     ids = [e.id for e in events]
     if len(set(ids)) != len(ids) or events != sorted(events, key=lambda e: e.at):
         raise ValueError("event IDs must be unique and events sorted by timestamp")
@@ -170,7 +192,7 @@ def load_task(path: str | Path, registry: ServiceRegistry = DEFAULT_REGISTRY) ->
             if event.operation not in adapter.operations or not adapter.is_mutating(event.operation):
                 raise ValueError(f"event must use a mutating operation: {event.id}")
             adapter.validate_arguments(event.operation, event.arguments)
-    package = TaskPackage(root=root, manifest=manifest, initial_world=world, events=events, context=contexts, rules=rules)
+    package = TaskPackage(root=root, manifest=manifest, initial_world=world, events=events, context=contexts, rules=rules, judge_instructions=instructions, judge_evidence_sources=evidence_sources)
     package._registry = registry
     return package
 
