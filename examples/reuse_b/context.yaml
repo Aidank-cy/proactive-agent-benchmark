@@ -1,0 +1,4 @@
+- event_id: user_start
+  goals: ["Observe synthetic counter B."]
+  preferences: []
+  constraints: ["Do not change the counter through Agent tools."]

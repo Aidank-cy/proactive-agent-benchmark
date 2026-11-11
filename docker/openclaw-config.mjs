@@ -21,8 +21,8 @@ const config = {
     baseUrl: 'http://model-proxy:8080/v1', apiKey: 'proxy-managed', api: 'openai-completions',
     models: [{ id: model, name: model, reasoning: false, input: ['text'], cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 }, contextWindow, maxTokens: 4096 }]
   } } },
-  mcp: { servers: { world: { url: 'http://world:8000/mcp', transport: 'streamable-http', enabled: true, toolFilter: { include: ['world_get', 'world_set', 'notify_user'] } } } },
-  tools: { profile: 'minimal', alsoAllow: ['world__world_get', 'world__world_set', 'world__notify_user'], deny: ['group:fs', 'group:runtime', 'group:web', 'group:sessions', 'gateway', 'cron', 'browser', 'nodes', 'message'] },
+  mcp: { servers: { world: { url: 'http://world:8000/mcp', transport: 'streamable-http', enabled: true } } },
+  tools: { profile: 'minimal', alsoAllow: ['world__*'], deny: ['group:fs', 'group:runtime', 'group:web', 'group:sessions', 'gateway', 'cron', 'browser', 'nodes', 'message'] },
   channels: {},
   plugins: { entries: {} }
 };

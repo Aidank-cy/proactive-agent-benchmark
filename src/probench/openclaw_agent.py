@@ -31,6 +31,14 @@ class OpenClawAgent:
         expected_name = os.environ.get("BENCH_RUN_NAME")
         if expected_name and run_dir.name != expected_name:
             raise ValueError(f"output directory name must match BENCH_RUN_NAME={expected_name}")
+        plan_path = os.environ.get("BENCH_PLAN_PATH")
+        if plan_path:
+            from .service_plan import load_plan, plan_digest, verify_plan
+            verify_plan(task, Path(plan_path))
+            self.plan_digest = plan_digest(load_plan(Path(plan_path)))
+        else:
+            self.plan_digest = None
+        self.task_id = task.manifest.task_id
         self.run_dir = run_dir
         self.metadata = {"runtime": "openclaw", "provider": "bench", "model": self.model, "api_base_url": self.provider_url, "temperature": os.environ.get("AGENT_TEMPERATURE", "0"), "context_window": os.environ.get("AGENT_CONTEXT_WINDOW", "128000"), "session_key": self.session_key, "gateway_url": self.base_url}
         (run_dir / "agent_config.json").write_text(json.dumps(self.metadata, indent=2), encoding="utf-8")
@@ -49,13 +57,13 @@ class OpenClawAgent:
     def start_turn(self, turn_id: int, timestamp: str, permissions: dict[str, list[str]]):
         assert self.run_dir is not None
         self.turn_id = turn_id
-        control = {"turn_id": turn_id, "timestamp": timestamp, "permissions": permissions}
+        control = {"turn_id": turn_id, "timestamp": timestamp, "permissions": permissions, "task_id": self.task_id, "plan_digest": self.plan_digest}
         (self.run_dir / "world_control.json").write_text(json.dumps(control), encoding="utf-8")
 
     def run_turn(self, observation: dict[str, Any], tools, history: list[dict[str, Any]]) -> dict[str, Any]:
         if self.run_dir is None:
             raise RuntimeError("OpenClawAgent.start_run was not called")
-        message = f"Benchmark Turn {self.turn_id}. Simulated time: {observation['timestamp']}. New observations: {json.dumps(observation['messages'], ensure_ascii=False)}. Use only benchmark world tools. Send unsolicited updates only with the notify_user tool. Your ordinary final answer is a reply to this invocation, not a proactive notification."
+        message = f"Task package: {self.task_id}. Benchmark Turn {self.turn_id}. Simulated time: {observation['timestamp']}. New observations: {json.dumps(observation['messages'], ensure_ascii=False)}. Use only benchmark world tools. Send unsolicited updates only with the notify_user tool. Your ordinary final answer is a reply to this invocation, not a proactive notification."
         headers = {"Authorization": f"Bearer {self.token}", "x-openclaw-model": f"bench/{self.model}"}
         payload = {"model": "openclaw/default", "user": self.session_key, "stream": False, "messages": [{"role": "user", "content": message}]}
         try:

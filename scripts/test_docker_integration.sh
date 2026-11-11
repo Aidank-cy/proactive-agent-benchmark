@@ -3,6 +3,7 @@ set -euo pipefail
 
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-probench-offline}"
 export BENCH_RUN_NAME="${BENCH_RUN_NAME:-openclaw-offline}"
+export BENCH_TASK_NAME=synthetic
 export OPENCLAW_IMAGE="${OPENCLAW_IMAGE:-terrarium/openclaw:latest}"
 export AGENT_API_BASE_URL="http://mock-model:8001/v1"
 export AGENT_API_KEY="offline-test-key"
@@ -16,6 +17,7 @@ if [[ "${BENCH_SKIP_BUILD:-0}" != "1" ]]; then
   docker compose build benchmark
 fi
 docker compose up -d --no-build openclaw world model-proxy mock-model
+docker compose run --rm benchmark pytest -q tests/test_services.py
 docker compose run --rm benchmark bench run examples/synthetic --agent openclaw --judge openai --output "runs/${BENCH_RUN_NAME}"
 docker compose run --rm benchmark bench report "runs/${BENCH_RUN_NAME}"
 python3 - "runs/${BENCH_RUN_NAME}" <<'PY'
@@ -39,21 +41,28 @@ PY
 docker compose logs mock-model | grep 'MOCK_MODEL_REQUEST model=fixture-model'
 docker compose logs mock-model | grep 'MOCK_MODEL_REQUEST model=fixture-judge'
 docker compose exec -T openclaw sh -lc 'test ! -e /app/examples/synthetic/judge/notification_rules.yaml && test -z "${BENCH_JUDGE_API_KEY+x}" && test -z "${AGENT_API_KEY+x}"'
+docker compose exec -T world sh -lc 'test ! -e /app/examples/synthetic/judge/notification_rules.yaml && test -z "${BENCH_JUDGE_API_KEY+x}"'
 
 first_run="${BENCH_RUN_NAME}"
 first_project="${COMPOSE_PROJECT_NAME}"
 export BENCH_RUN_NAME="${first_run}-isolation"
 export COMPOSE_PROJECT_NAME="${first_project}-isolation"
+export BENCH_TASK_NAME=reuse_a
 docker compose up -d --no-build openclaw world model-proxy mock-model
-docker compose run --rm benchmark bench run examples/synthetic --agent openclaw --judge openai --output "runs/${BENCH_RUN_NAME}"
+docker compose run --rm benchmark bench run examples/reuse_a --agent openclaw --judge openai --output "runs/${BENCH_RUN_NAME}"
 python3 - "runs/${first_run}" "runs/${BENCH_RUN_NAME}" <<'PY'
 import json, pathlib, sys
 a, b = [pathlib.Path(x) for x in sys.argv[1:]]
 first_a = json.loads((a / 'turns/turn_0001.json').read_text())
 first_b = json.loads((b / 'turns/turn_0001.json').read_text())
-assert first_a['world_pre']['kv']['item'] == first_b['world_pre']['kv']['item'] == 0
+assert first_a['world_pre']['kv']['item'] == 0
+assert first_b['world_pre']['counter']['value'] == 2
 assert first_a['agent_session_reference'] != first_b['agent_session_reference']
 assert json.loads((a / 'turns/turn_0004.json').read_text())['world_post']['kv']['item'] == 1
+second_turn = json.loads((b / 'turns/turn_0002.json').read_text())
+assert second_turn['world_pre']['counter']['value'] == 5
+assert second_turn['world_post']['counter']['value'] == 7
+assert any(x['tool'] == 'counter.increment' for x in second_turn['action_trace'])
 print('Docker task and session isolation assertions passed')
 PY
 docker compose down -v --remove-orphans

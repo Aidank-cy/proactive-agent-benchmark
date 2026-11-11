@@ -34,8 +34,8 @@ def run(task: TaskPackage, agent: Agent, judge: Judge, run_dir: Path, adapters: 
     if run_dir.exists() and any(run_dir.iterdir()):
         raise FileExistsError(f"run directory is not empty: {run_dir}")
     run_dir.mkdir(parents=True, exist_ok=True)
-    adapters = adapters or {"kv": KVAdapter()}
-    if any(name not in adapters for name in task.manifest.adapters):
+    adapters = adapters or task.service_adapters()
+    if any(binding.id not in adapters for binding in task.manifest.bindings()):
         raise ValueError("missing domain adapter")
     world = SQLiteWorld(run_dir / "world.db", task.initial_world, adapters)
     workspace = Workspace(run_dir / "agent_workspace", task.manifest.workspace_files)

@@ -4,6 +4,7 @@ __pycache__/
 .venv/
 *.egg-info/
 runs/
+plans/
 *.db
 .env
 .env.*

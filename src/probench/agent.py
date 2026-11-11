@@ -45,14 +45,16 @@ class ToolGateway:
         name = f"{adapter}.{operation}"
         seq = len(self.trace) + 1
         before = self._world.snapshot()
+        read_only = False
         try:
             if operation not in self._allowed.get(adapter, []):
                 raise PermissionError(f"tool unavailable: {name}")
-            result, changes = self._world.execute(adapter, operation, arguments, mutate=self._world.adapters[adapter].is_mutating(operation), source=f"agent-action-{seq}", timestamp=self._timestamp)
+            read_only = not self._world.adapters[adapter].is_mutating(operation)
+            result, changes = self._world.execute(adapter, operation, arguments, mutate=not read_only, source=f"agent-action-{seq}", timestamp=self._timestamp)
             success, error = True, None
         except Exception as exc:
             result, changes, success, error = None, {}, False, str(exc)
-        self.trace.append(dict(seq=seq, tool=name, arguments=copy.deepcopy(arguments), result=result, success=success, error=error, changes=changes, world_before=before, world_after=self._world.snapshot()))
+        self.trace.append(dict(seq=seq, tool=name, arguments=copy.deepcopy(arguments), result=result, success=success, error=error, read_only=read_only, changes=changes, world_before=before, world_after=self._world.snapshot()))
         return result if success else {"error": error}
 
     def memory_read(self, name: str):

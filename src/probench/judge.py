@@ -96,8 +96,8 @@ class MockJudge:
         writes = [a for a in actions if a["success"] and a["changes"]]
         if writes:
             return TaskVerdict(category="goal_progress", score=1, explanation="Authoritative state changed in the scripted fixture.", evidence_refs=[f"action:{a['seq']}" for a in writes])
-        previous_reads = {(a["tool"], json.dumps(a["result"], sort_keys=True)) for p in previous for a in p.get("action_trace", []) if a["success"] and a["tool"].endswith(".get")}
-        reads = [a for a in actions if a["success"] and a["tool"].endswith(".get") and (a["tool"], json.dumps(a["result"], sort_keys=True)) not in previous_reads and a["result"] is not None]
+        previous_reads = {(a["tool"], json.dumps(a["result"], sort_keys=True)) for p in previous for a in p.get("action_trace", []) if a["success"] and a.get("read_only", False)}
+        reads = [a for a in actions if a["success"] and a.get("read_only", False) and (a["tool"], json.dumps(a["result"], sort_keys=True)) not in previous_reads and a["result"] is not None]
         if reads:
             return TaskVerdict(category="useful_information", score=0.5, explanation="New read result in the scripted fixture.", evidence_refs=[f"action:{a['seq']}" for a in reads])
         return TaskVerdict(category="no_progress", score=0, explanation="No new state or information in the scripted fixture.", evidence_refs=["turn:response"])

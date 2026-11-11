@@ -1,0 +1,4 @@
+[
+  {"calls": [{"adapter": "counter", "operation": "read", "arguments": {}}], "response": "Read A."},
+  {"calls": [{"adapter": "counter", "operation": "increment", "arguments": {"amount": 2}}], "response": "Updated A."}
+]

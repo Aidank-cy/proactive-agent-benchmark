@@ -29,7 +29,12 @@ def _agent_reply(body):
     has_tool_result = any(x.get("role") == "tool" for x in messages[idx + 1:])
     if has_tool_result or turn == 4:
         return {"role": "assistant", "content": f"Synthetic Turn {turn} complete."}, "stop"
-    calls = {1: ("world__world_set", {"key": "item", "value": 1}), 2: ("world__world_get", {"key": "signal"}), 3: ("world__notify_user", {"text": "The signal changed.", "opportunity_id": "material_signal:change"})}
+    if "synthetic_counter_a" in user:
+        calls = {1: ("world__counter_read", {}), 2: ("world__counter_increment", {"amount": 2})}
+    elif "synthetic_counter_b" in user:
+        calls = {1: ("world__counter_read", {}), 2: ("world__counter_read", {})}
+    else:
+        calls = {1: ("world__world_set", {"key": "item", "value": 1}), 2: ("world__world_get", {"key": "signal"}), 3: ("world__notify_user", {"text": "The signal changed.", "opportunity_id": "material_signal:change"})}
     if turn not in calls:
         return {"role": "assistant", "content": "Routine check complete."}, "stop"
     name, args = calls[turn]

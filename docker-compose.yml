@@ -1,4 +1,21 @@
 services:
+  prepare:
+    image: probench:local
+    command: ["sh", "-lc", "bench prepare examples/$${BENCH_TASK_NAME} --output /app/plans/$${BENCH_RUN_NAME}.json"]
+    environment:
+      BENCH_TASK_NAME: ${BENCH_TASK_NAME:-synthetic}
+      BENCH_RUN_NAME: ${BENCH_RUN_NAME:-openclaw-demo}
+      PYTHONPATH: /app/src
+      BENCH_SERVICE_MODULES: ${BENCH_SERVICE_MODULES:-}
+    volumes:
+      - ${BENCH_TASKS_HOST_DIR:-./examples}:/app/examples:ro
+      - ./plans:/app/plans
+      - ./src:/app/src:ro
+    network_mode: none
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
   benchmark:
     image: probench:local
     build: .
@@ -13,11 +30,15 @@ services:
       BENCH_JUDGE_API_KEY: ${BENCH_JUDGE_API_KEY:-offline-test-key}
       BENCH_JUDGE_MODEL: ${BENCH_JUDGE_MODEL:-fixture-judge}
       BENCH_RUN_NAME: ${BENCH_RUN_NAME:-openclaw-demo}
+      BENCH_PLAN_PATH: /app/plans/${BENCH_RUN_NAME:-openclaw-demo}.json
       PYTHONPATH: /app/src
+      BENCH_SERVICE_MODULES: ${BENCH_SERVICE_MODULES:-}
     volumes:
       - ./runs:/app/runs
-      - ./examples:/app/examples:ro
+      - ${BENCH_TASKS_HOST_DIR:-./examples}:/app/examples:ro
+      - ./plans:/app/plans:ro
       - ./src:/app/src:ro
+      - ./tests:/app/tests:ro
     networks: [agent_private, judge_egress]
     depends_on: [openclaw, world, model-proxy]
   openclaw:
@@ -47,15 +68,21 @@ services:
     environment:
       BENCH_RUN_NAME: ${BENCH_RUN_NAME:-openclaw-demo}
       BENCH_RUNS_ROOT: /app/runs
+      BENCH_PLAN_PATH: /app/plans/${BENCH_RUN_NAME:-openclaw-demo}.json
       PYTHONPATH: /app/src
+      BENCH_SERVICE_MODULES: ${BENCH_SERVICE_MODULES:-}
     volumes:
       - ./runs:/app/runs
+      - ./plans:/app/plans:ro
       - ./src:/app/src:ro
     read_only: true
     tmpfs: [/tmp]
     security_opt: [no-new-privileges:true]
     cap_drop: [ALL]
     networks: [agent_private]
+    depends_on:
+      prepare:
+        condition: service_completed_successfully
   model-proxy:
     image: probench:local
     command: ["python", "-m", "probench.model_proxy"]

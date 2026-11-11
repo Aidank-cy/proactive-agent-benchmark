@@ -10,6 +10,7 @@ from .judge import MockJudge, OpenAICompatibleJudge
 from .openclaw_agent import OpenClawAgent
 from .runtime import run, verify_evidence
 from .schema import load_task
+from .service_plan import write_plan
 
 
 def main():
@@ -17,6 +18,9 @@ def main():
     commands = parser.add_subparsers(dest="command", required=True)
     validate = commands.add_parser("validate")
     validate.add_argument("task_path")
+    prepare = commands.add_parser("prepare")
+    prepare.add_argument("task_path")
+    prepare.add_argument("--output", required=True)
     execute = commands.add_parser("run")
     execute.add_argument("task_path")
     execute.add_argument("--agent", default="openclaw", help="openclaw, mock, or importable module:Class implementing run_turn")
@@ -28,6 +32,10 @@ def main():
     if args.command == "validate":
         task = load_task(args.task_path)
         print(f"Valid: {task.manifest.task_id} ({len(task.events)} events)")
+    elif args.command == "prepare":
+        task = load_task(args.task_path)
+        write_plan(task, Path(args.output))
+        print(f"Prepared public service plan: {args.output}")
     elif args.command == "run":
         task = load_task(args.task_path)
         if args.agent == "openclaw":

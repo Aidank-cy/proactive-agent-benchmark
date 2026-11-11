@@ -1,0 +1,14 @@
+task_id: synthetic_counter_a
+metadata: {description: First configuration of the reusable synthetic counter service}
+initial_timestamp: 2026-01-01T00:00:00+00:00
+duration_seconds: 300
+services:
+  - {id: counter, service: counter}
+tool_permissions:
+  counter: [read, increment]
+workspace_files: {}
+judge: {completion_policy: expire}
+initial_world: initial_world.yaml
+events: events.yaml
+context: context.yaml
+notification_rules: judge/notification_rules.yaml

@@ -6,13 +6,17 @@ Reusable infrastructure for long-horizon simulated tasks. The included fixture i
 
 ```mermaid
 flowchart LR
-  P[Task package] --> C[World controller]
+  PK[Task package] --> C[World controller]
+  PK --> PL[Public service plan]
+  SR[Shared service registry] --> PL
+  SR --> W
+  PL --> G[MCP selected tools]
   C --> W[(SQLite world)]
   C --> O[Agent observation]
   O --> A[OpenClaw Gateway]
-  A --> P[Model API proxy]
-  P --> L[Evaluated model API]
-  A --> G[MCP world tools]
+  A --> MP[Model API proxy]
+  MP --> L[Evaluated model API]
+  A --> G
   G --> W
   A --> M[OpenClaw session and workspace]
   C --> E[Immutable turn evidence]
@@ -20,22 +24,28 @@ flowchart LR
   G --> E
   E --> J[Judge LLM]
   J --> K[Independent Judge API]
-  P -->|hidden rules and disclosed context| J
+  PK -->|hidden rules and disclosed context| J
   J --> T[Opportunity tracker]
   J --> S[Turn task verdict]
   T --> R[R_notify]
   S --> Q[R_task]
 ```
 
-The controller groups events by timestamp. Each timestamp is an environment tick, even if no agent runs. It applies all mutations in file order, captures `world_pre`, then invokes one Agent Turn if a user message, notification, or scheduled wakeup occurs. OpenClaw handles its own planning, model calls, session history, and tool loop. The controller gathers MCP calls from the shared SQLite world history and proactive notifications from a simulated inbox. `world_post`, response, and workspace/session reference complete the frozen turn evidence. Task and notification judging are separate calls. Subsequent ticks continue from persistent SQLite state.
+The controller groups events by timestamp. Each timestamp is an environment tick, even if no agent runs. It applies all mutations in file order, captures `world_pre`, then invokes one Agent Turn if a user message, notification, or scheduled wakeup occurs. OpenClaw handles its own planning, model calls, session history, and tool loop. The controller gathers MCP calls from the service audit log and proactive notifications from a simulated inbox. `world_post`, response, and workspace/session reference complete the frozen turn evidence. Task and notification judging are separate calls. Subsequent ticks continue from each run's persistent SQLite state.
 
-The Agent sees only scheduled messages, its OpenClaw session and workspace, and permitted MCP tools. It never receives future events, authoritative snapshots, `goal_context_t`, or judge files. The controller builds `goal_context_t` only from user-message disclosures through the current turn. The judge sees that context, hidden rules, authoritative snapshots, action evidence, prior evidence, and opportunity state. The OpenClaw container mounts only its state volume and a config generator; judge files, run evidence, and Judge credentials are absent. Its tool policy allows only three benchmark MCP tools. No real channel is configured. The private Docker network has no external route; only the narrow model proxy can reach the configured Agent model API.
+The Agent sees only scheduled messages, its OpenClaw session and workspace, and the task-selected MCP tools. It never receives future events, authoritative snapshots, `goal_context_t`, or judge files. The controller builds `goal_context_t` only from user-message disclosures through the current turn. The judge sees that context, hidden rules, authoritative snapshots, action evidence, prior evidence, and opportunity state. The OpenClaw container mounts only its state volume and a config generator; judge files, run evidence, and Judge credentials are absent. The world service receives a public service plan containing only service bindings and allowed tools. No real channel is configured. The private Docker network has no external route; only the narrow model proxy can reach the configured Agent model API.
 
 ## Package schema
 
-`manifest.yaml`: `task_id`, `metadata`, timezone-aware `initial_timestamp`, `duration_seconds`, `adapters`, initial `workspace_files`, `tool_permissions` mapping adapter names to operations, `judge` settings (`completion_policy: expire|keep`), and relative paths `initial_world`, `events`, `context`, `notification_rules`. All paths are confined to the package root.
+`manifest.yaml`: `task_id`, `metadata`, timezone-aware `initial_timestamp`, `duration_seconds`, `services` bindings, initial `workspace_files`, `tool_permissions` mapping binding IDs to operations, `judge` settings (`completion_policy: expire|keep`), and relative paths `initial_world`, `events`, `context`, `notification_rules`. A binding has `id`, registered `service`, optional service `config`, and optional `tool_prefix`. The legacy `adapters: [kv]` field remains supported for the original fixture. All paths are confined to the package root.
 
-`initial_world.yaml`: mapping of adapter name to its initial JSON-compatible state. The included `kv` adapter supports `get` and `set`; register additional `DomainAdapter` implementations for future domains. Each run has its own SQLite database. Adapters declare read versus write operations with `is_mutating()` and implement them through `execute`; the controller alone can inspect snapshots and history. `reset` and `replay` reproduce recorded operations from the initial state and check result/changes for divergence.
+`initial_world.yaml`: mapping of service binding ID to that task's initial JSON-compatible state. The same registered service can be bound by multiple tasks with different data and events. Each run has its own SQLite database. Services validate state and operation arguments before execution. The controller alone can inspect snapshots and history. `reset` and `replay` reproduce recorded operations from the initial state and check result/changes for divergence.
+
+## Reusable services
+
+[`services.py`](src/probench/services.py) defines `DomainAdapter`, `OperationSpec`, `ServiceBase`, and `ServiceRegistry`. Each service provides a Pydantic state schema, typed input models for operations, read/write classification, descriptions, and an `execute` implementation. Register a factory under a stable service name, then select it in task manifests. For a separate module, set `BENCH_SERVICE_MODULES=your_package.service_module` in all benchmark services; that module should register its factory in `DEFAULT_REGISTRY`. Future Calendar, Email, Notion, Booking, and Weather services belong in such modules; their schemas and behavior are not implemented yet. The included `kv` and `counter` services are domain-neutral infrastructure fixtures. `examples/reuse_a` and `examples/reuse_b` use the same `CounterAdapter` class with different initial values, mutations, and permissions.
+
+`bench prepare <task_path> --output <plan_path>` writes a public plan from the task package. Docker Compose runs this as an isolated preparation service before starting the world service. [`world_mcp.py`](src/probench/world_mcp.py) registers only the permitted operations from that plan as typed MCP tools, plus the simulated `notify_user` tool. The world service has no task-package mount, and the OpenClaw container has neither the package nor the plan mounted. The controller checks the plan against the selected task before each run; the MCP service checks its digest and permissions for every Turn. A new Docker Compose project and run name are required when switching task packages.
 
 `events.yaml`: time-sorted list with unique `id`, timezone-aware `at`, `kind` (`world_mutation`, `user_message`, `notification`, `scheduled_wakeup`, `time_advance`), optional `adapter`, `operation`, `arguments`, and `body`. Silent mutation is allowed. Multiple events may share a timestamp.
 
@@ -56,6 +66,8 @@ Required notifications are scored once per opportunity: timely correct `+1`, par
 ```bash
 python -m pip install -e '.[test]'
 bench validate examples/synthetic
+bench validate examples/reuse_a
+bench prepare examples/reuse_a --output plans/reuse-a.json
 bench run examples/synthetic --agent mock --judge mock --output runs/example
 bench report runs/example
 pytest -q
@@ -67,7 +79,7 @@ For a real Judge set `BENCH_JUDGE_BASE_URL`, `BENCH_JUDGE_API_KEY`, and `BENCH_J
 
 The production Agent adapter calls the [documented Gateway chat completions API](https://docs.openclaw.ai/gateway/openai-http-api) with one stable `user` per run. OpenClaw uses an [MCP server](https://docs.openclaw.ai/tools/mcp) for world reads, writes, and `notify_user`, and its [tool policy](https://docs.openclaw.ai/gateway/config-tools/tool-policy) excludes filesystem, shell, web, session, gateway, browser, and real messaging tools. The simulated inbox stores notification text and simulated timestamps. The Gateway model provider uses the [custom provider configuration](https://docs.openclaw.ai/gateway/config-tools/custom-providers) with `bench/${AGENT_MODEL}` as the actual model. `AGENT_API_BASE_URL` and `AGENT_API_KEY` are held only by the model proxy. The Judge API variables are held only by the benchmark orchestrator. Neither side implicitly inherits the other's provider settings.
 
-Copy `.env.example` to `.env` and edit it. Use a unique `COMPOSE_PROJECT_NAME` and `BENCH_RUN_NAME` for each run. Set `OPENCLAW_GATEWAY_TOKEN` to a random value for nonlocal deployments. The official image is the default; `OPENCLAW_IMAGE` can pin a compatible version. The Docker volumes retain OpenClaw memory, while `runs/<BENCH_RUN_NAME>` retains world state and evidence. Do not reuse a run name without resetting its stack and run directory.
+Copy `.env.example` to `.env` and edit it. Set `BENCH_TASK_NAME` to a directory under `BENCH_TASKS_HOST_DIR` (default `./examples`). Use a unique `COMPOSE_PROJECT_NAME` and `BENCH_RUN_NAME` for each run. Set `OPENCLAW_GATEWAY_TOKEN` to a random value for nonlocal deployments. The official image is the default; `OPENCLAW_IMAGE` can pin a compatible version. The Docker volumes retain OpenClaw memory, while `runs/<BENCH_RUN_NAME>` retains world state and evidence. Do not reuse a run name without resetting its stack and run directory.
 
 ```bash
 docker compose build benchmark
@@ -83,7 +95,7 @@ Offline integration test (real OpenClaw with local mock Agent and Judge API serv
 OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:latest bash scripts/test_docker_integration.sh
 ```
 
-Use `OPENCLAW_IMAGE=terrarium/openclaw:latest` only if that compatible local image is already installed. The script verifies world tool calls, persistent session identity, notification delivery, hidden-file absence from observations, and both metrics.
+Use `OPENCLAW_IMAGE=terrarium/openclaw:latest` only if that compatible local image is already installed. The script verifies dynamic MCP registration, world tool calls, persistent session identity, notification delivery, two independent task configurations, and both metrics for the original fixture.
 
 Real API smoke test after exporting all seven credentials/settings listed in `.env.example`:
 
@@ -101,5 +113,5 @@ Known limitations: the domain-neutral fixture uses a scripted mock model for off
 
 ## Architectural reference
 
-Studied [VibeLifeBench](https://github.com/evolvent-ai/VibeLifeBench) task entries, event handling, workspace bootstrap, tool traces, and stage state/rubrics. This framework uses its separation of runtime responsibilities. Its own additions are a task-independent LLM Judge contract, explicit cross-Turn notification opportunity settlement, dual independent metrics, isolated OpenClaw sessions, and an API proxy that confines Agent model egress. The synthetic fixture is infrastructure evidence, not a domain benchmark.
+Studied [VibeLifeBench](https://github.com/evolvent-ai/VibeLifeBench) task entries, shared capability bindings, event handling, workspace bootstrap, tool traces, and stage state/rubrics. This framework shares service implementations across task packages while keeping each task's data and events independent. Its own additions are a task-independent LLM Judge contract, explicit cross-Turn notification opportunity settlement, dual independent metrics, isolated OpenClaw sessions, and an API proxy that confines Agent model egress. The synthetic fixtures are infrastructure evidence, not domain benchmarks.
 

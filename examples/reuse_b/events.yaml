@@ -1,0 +1,3 @@
+- {id: user_start, at: 2026-01-01T00:00:00+00:00, kind: user_message, body: "Synthetic counter B: observe this value."}
+- {id: change_b, at: 2026-01-01T00:02:00+00:00, kind: world_mutation, adapter: counter, operation: increment, arguments: {amount: 1}}
+- {id: wake_b, at: 2026-01-01T00:02:00+00:00, kind: scheduled_wakeup}

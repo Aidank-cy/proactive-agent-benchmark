@@ -1,0 +1,4 @@
+- event_id: user_start
+  goals: ["Maintain synthetic counter A."]
+  preferences: []
+  constraints: ["Use only permitted counter tools."]

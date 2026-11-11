@@ -29,7 +29,11 @@ def test_gateway_adapter_reuses_session_and_separates_secrets(tmp_path, monkeypa
     agent = OpenClawAgent()
     run_dir = tmp_path / "run"
     run_dir.mkdir()
-    agent.start_run(None, run_dir)
+    class Task:
+        class Manifest:
+            task_id = "test_task"
+        manifest = Manifest()
+    agent.start_run(Task(), run_dir)
     for turn in (1, 2):
         agent.start_turn(turn, "2026-01-01T00:00:00+00:00", {"kv": ["get"]})
         result = agent.run_turn({"timestamp": "2026-01-01T00:00:00+00:00", "messages": [{"event_id": f"wake_{turn}", "kind": "scheduled_wakeup", "body": None}]}, None, [])
