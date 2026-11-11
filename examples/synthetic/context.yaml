@@ -1,0 +1,6 @@
+- event_id: user_start
+  goals: ["Maintain the synthetic item."]
+  preferences: ["Receive material-change notifications."]
+  constraints: ["Use only permitted tools."]
+  interaction: "User requested ongoing monitoring."
+

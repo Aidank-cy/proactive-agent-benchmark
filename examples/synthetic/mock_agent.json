@@ -1,0 +1,7 @@
+[
+  {"calls": [{"adapter": "kv", "operation": "set", "arguments": {"key": "item", "value": 1}}], "memory": {"notes.txt": "item set to 1"}, "response": "Updated the item."},
+  {"calls": [{"adapter": "kv", "operation": "get", "arguments": {"key": "signal"}}], "memory": {"notes.txt": "item set to 1; signal changed"}, "response": "Checking the changed signal."},
+  {"calls": [{"adapter": "kv", "operation": "get", "arguments": {"key": "item"}}], "response": "Follow-up complete.", "proactive_notifications": [{"opportunity_id": "material_signal:change", "text": "The signal changed."}]},
+  {"response": "Routine check complete."}
+]
+

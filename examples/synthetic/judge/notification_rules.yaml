@@ -1,0 +1,10 @@
+- id: material_signal
+  description: A material change to the synthetic signal warrants a notification.
+  trigger_event_ids: [change]
+  deadline_seconds: 150
+  related_goal: "Maintain the synthetic item."
+  content_requirements: ["Describe the changed signal accurately."]
+  closing_conditions: "Cancel if the signal is restored before notification and the user needs no update."
+  unnecessary_conditions: "Routine unchanged checks require no notification."
+  authorization_requirements: "No external action is authorized by this rule."
+

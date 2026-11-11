@@ -1,0 +1,19 @@
+- id: user_start
+  at: 2026-01-01T00:00:00+00:00
+  kind: user_message
+  body: "Track the item and keep me informed of material changes."
+- id: change
+  at: 2026-01-01T00:01:00+00:00
+  kind: world_mutation
+  operation: set
+  arguments: {key: signal, value: changed}
+- id: wake_check
+  at: 2026-01-01T00:01:00+00:00
+  kind: scheduled_wakeup
+- id: wake_followup
+  at: 2026-01-01T00:02:00+00:00
+  kind: scheduled_wakeup
+- id: wake_quiet
+  at: 2026-01-01T00:03:00+00:00
+  kind: scheduled_wakeup
+
