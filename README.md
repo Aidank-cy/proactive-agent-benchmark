@@ -32,7 +32,7 @@ The Agent sees only scheduled messages, prior legitimate interaction history, it
 
 `manifest.yaml`: `task_id`, `metadata`, timezone-aware `initial_timestamp`, `duration_seconds`, `adapters`, initial `workspace_files`, `tool_permissions` mapping adapter names to operations, `judge` settings (`completion_policy: expire|keep`), and relative paths `initial_world`, `events`, `context`, `notification_rules`. All paths are confined to the package root.
 
-`initial_world.yaml`: mapping of adapter name to its initial JSON-compatible state. The included `kv` adapter supports `get` and `set`; register additional `DomainAdapter` implementations for future domains. Each run has its own SQLite database. Adapters implement state reads and writes through `execute`; the controller alone can inspect snapshots and history. `reset` and `replay` reproduce recorded operations from the initial state and check result/changes for divergence.
+`initial_world.yaml`: mapping of adapter name to its initial JSON-compatible state. The included `kv` adapter supports `get` and `set`; register additional `DomainAdapter` implementations for future domains. Each run has its own SQLite database. Adapters declare read versus write operations with `is_mutating()` and implement them through `execute`; the controller alone can inspect snapshots and history. `reset` and `replay` reproduce recorded operations from the initial state and check result/changes for divergence.
 
 `events.yaml`: time-sorted list with unique `id`, timezone-aware `at`, `kind` (`world_mutation`, `user_message`, `notification`, `scheduled_wakeup`, `time_advance`), optional `adapter`, `operation`, `arguments`, and `body`. Silent mutation is allowed. Multiple events may share a timestamp.
 

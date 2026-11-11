@@ -48,7 +48,7 @@ class ToolGateway:
         try:
             if operation not in self._allowed.get(adapter, []):
                 raise PermissionError(f"tool unavailable: {name}")
-            result, changes = self._world.execute(adapter, operation, arguments, mutate=operation != "get", source=f"agent-action-{seq}", timestamp=self._timestamp)
+            result, changes = self._world.execute(adapter, operation, arguments, mutate=self._world.adapters[adapter].is_mutating(operation), source=f"agent-action-{seq}", timestamp=self._timestamp)
             success, error = True, None
         except Exception as exc:
             result, changes, success, error = None, {}, False, str(exc)

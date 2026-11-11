@@ -9,12 +9,18 @@ from typing import Any, Protocol
 
 class DomainAdapter(Protocol):
     name: str
+    def is_mutating(self, operation: str) -> bool: ...
     def execute(self, state: dict[str, Any], operation: str, arguments: dict[str, Any], *, mutate: bool) -> tuple[Any, dict[str, Any]]: ...
 
 
 class KVAdapter:
     """Domain-neutral fixture adapter; replace or register domain adapters for real tasks."""
     name = "kv"
+
+    def is_mutating(self, operation: str) -> bool:
+        if operation not in ("get", "set"):
+            raise ValueError(f"unsupported operation: {operation}")
+        return operation == "set"
 
     def execute(self, state, operation, arguments, *, mutate):
         key = arguments.get("key")
