@@ -1,0 +1,24 @@
+calendar:
+  client_meeting: {date: null, time: null, location: null, status: tentative}
+  internal_review: {date: "2026-11-23", time: "14:00", status: planned, importance: high, participants: executives}
+  unrelated_event: {date: "2026-11-28", time: "16:00", title: "Team game"}
+flights:
+  outbound: {code: "MU5101", route: "SHA-PEK", date: "2026-11-22", time: "15:00", status: quoted, fare_cny: 1500, cabin: economy}
+  return: {code: "MU5108", route: "PEK-SHA", date: "2026-11-25", time: "18:00", status: quoted, fare_cny: 1300, cabin: economy}
+  alternatives: [{code: "MU5103", date: "2026-11-22", time: "17:00", fare_cny: 1750, requires_new_payment: true}, {code: "G112", date: "2026-11-22", time: "13:00", fare_cny: 900, requires_new_payment: true}]
+  return_alternatives: [{code: "G125", date: "2026-11-25", time: "17:00", fare_cny: 850, requires_new_payment: true}]
+hotel:
+  reservation: {name: "Test Hotel", check_in: "2026-11-22", check_out: "2026-11-25", nightly_cny: 400, status: quoted, late_arrival_registered: false}
+  options: [{name: "Test Hotel", nightly_cny: 400, distance_minutes: 20}, {name: "Noise Hotel", nightly_cny: 700, distance_minutes: 10}]
+expenses:
+  estimates: {outbound_cny: 1500, return_cny: 1300, hotel_cny: 1200, local_transit_cny: 300, total_cny: 4300}
+  policy: {hotel_nightly_cap_cny: 500, economy_required: false, invoice_required: false}
+  payment: {status: unpaid, authorization: none}
+  invoice: {status: not_requested}
+inbox:
+  airline_notice: {status: none}
+  ad_email: {subject: "Discount luggage", relevant: false}
+  duplicate_notice: {status: none}
+transit:
+  meeting_route: {destination: unknown, minutes: null, status: not_planned}
+  noise_route: {destination: museum, minutes: 50, relevant: false}

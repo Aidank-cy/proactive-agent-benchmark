@@ -132,16 +132,16 @@ def test_tracker_settles_once_and_deadline(tmp_path):
     first = tracker.create(rule, "change", "2026-01-01T00:01:00+00:00")
     assert tracker.create(rule, "change", "2026-01-01T00:01:00+00:00") is first
     assert first["notification_deadline"] == "2026-01-01T00:03:30+00:00"
-    tracker.settle(first["opportunity_id"], "NOTIFIED", 1, "2026-01-01T00:02:00+00:00", "sent", ["turn:notification"])
+    tracker.settle(first["opportunity_id"], "NOTIFIED", 1, "2026-01-01T00:02:00+00:00", "sent", ["turn:notification"], ["notification:test"])
     with pytest.raises(ValueError, match="already settled"):
-        tracker.settle(first["opportunity_id"], "NOTIFIED", 1, "2026-01-01T00:03:00+00:00", "duplicate", [])
+        tracker.settle(first["opportunity_id"], "NOTIFIED", 1, "2026-01-01T00:03:00+00:00", "duplicate", [], ["notification:test"])
 
 
 def test_missing_and_duplicate_notifications(tmp_path):
     task, script = fixture()
     task.rules[0].deadline_seconds = 90
     script[2].pop("proactive_notifications")
-    script[3]["proactive_notifications"] = [{"opportunity_id": "material_signal:change", "text": "late"}]
+    script[3]["proactive_notifications"] = [{"text": "late"}]
     result = execute(tmp_path, task, script)
     assert result["missed_notification_count"] == 1
     assert result["opportunities"][0]["final_score"] == 0

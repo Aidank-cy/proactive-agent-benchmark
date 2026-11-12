@@ -17,9 +17,11 @@ if [[ "${BENCH_SKIP_BUILD:-0}" != "1" ]]; then
   docker compose build benchmark
 fi
 docker compose up -d --no-build openclaw world model-proxy mock-model
-docker compose run --rm benchmark pytest -q tests/test_services.py tests/test_judge_evidence.py tests/test_storage_resume.py
+docker compose run --rm benchmark pytest -q tests/test_services.py tests/test_judge_evidence.py tests/test_storage_resume.py tests/test_notification_matching.py tests/test_travel_beijing.py
 docker compose run --rm benchmark bench run examples/synthetic --agent openclaw --judge openai --output "runs/${BENCH_RUN_NAME}"
 docker compose run --rm benchmark bench report "runs/${BENCH_RUN_NAME}"
+docker compose run --rm benchmark bench validate examples/travel_beijing_20turn
+docker compose run --rm benchmark bench run examples/travel_beijing_20turn --agent mock --judge fixture_judge:TravelFixtureJudge --output "runs/${BENCH_RUN_NAME}-travel"
 python3 - "runs/${BENCH_RUN_NAME}" <<'PY'
 import json, pathlib, sqlite3, sys
 root = pathlib.Path(sys.argv[1])
@@ -39,6 +41,8 @@ assert json.loads((root / 'run_metadata.json').read_text())['judge_runtime'] == 
 with sqlite3.connect(root / 'world.db') as db:
     notification_id, action_id = db.execute('SELECT notification_id,action_id FROM notifications').fetchone()
     assert db.execute('SELECT notification_id FROM mcp_actions WHERE action_id=?', (action_id,)).fetchone()[0] == notification_id
+    assert json.loads(db.execute('SELECT arguments FROM mcp_actions WHERE action_id=?', (action_id,)).fetchone()[0]) == {'text': 'The signal changed.'}
+    assert db.execute('SELECT notification_id FROM opportunity_notifications').fetchone()[0] == notification_id
     assert db.execute('SELECT COUNT(*) FROM judgments').fetchone()[0] == 8
     assert db.execute('SELECT COUNT(*) FROM judgments WHERE raw_output IS NOT NULL').fetchone()[0] == 8
     assert db.execute('SELECT COUNT(*) FROM opportunity_history').fetchone()[0] >= 2

@@ -96,7 +96,7 @@ def build_mcp(plan: dict, run_dir: Path, registry: ServiceRegistry = DEFAULT_REG
             callback = lambda args, inst=instance, op=operation: execute(inst, op, args)
             server.add_tool(_tool_function(name, spec.description, spec.input_model, callback), name=name, description=spec.description)
 
-    def notify_user(text: str, opportunity_id: str = ""):
+    def notify_user(text: str):
         """把主动通知写入模拟用户收件箱，不连接真实消息渠道。
 
         同时记录通知时间与 MCP 动作，使 Judge 能区别主动通知和普通回复。
@@ -106,9 +106,9 @@ def build_mcp(plan: dict, run_dir: Path, registry: ServiceRegistry = DEFAULT_REG
             world = SQLiteWorld(run_dir / "world.db", {}, adapters)
             try:
                 action_id = world.next_action_id(turn["turn_id"])
-                notification_id = world.notify(turn["turn_id"], turn["timestamp"], text, opportunity_id or None, action_id=action_id)
+                notification_id = world.notify(turn["turn_id"], turn["timestamp"], text, action_id=action_id)
                 result = {"delivered_to": "simulated_user_inbox", "timestamp": turn["timestamp"], "notification_id": notification_id}
-                world.record_mcp_action(turn["turn_id"], turn["timestamp"], "notify_user", {"text": text, "opportunity_id": opportunity_id}, result, True, None, {}, action_id=action_id, notification_id=notification_id)
+                world.record_mcp_action(turn["turn_id"], turn["timestamp"], "notify_user", {"text": text}, result, True, None, {}, action_id=action_id, notification_id=notification_id)
                 return result
             finally:
                 world.close()

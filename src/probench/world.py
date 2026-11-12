@@ -126,14 +126,14 @@ class SQLiteWorld:
         seq = self.conn.execute("SELECT COUNT(*) FROM mcp_actions WHERE turn_id=?", (turn_id,)).fetchone()[0] + 1
         return f"turn:{turn_id}:action:{seq}"
 
-    def notify(self, turn_id: int, timestamp: str, content: str, opportunity_id: str | None, *, action_id: str | None = None, notification_id: str | None = None):
+    def notify(self, turn_id: int, timestamp: str, content: str, *, action_id: str | None = None, notification_id: str | None = None):
         notification_id = notification_id or f"notification:turn:{turn_id}:{self.conn.execute('SELECT COUNT(*) FROM notifications WHERE turn_id=?', (turn_id,)).fetchone()[0] + 1}"
         with self.conn:
-            self.conn.execute("INSERT INTO notifications (notification_id,turn_id,action_id,at,text,opportunity_id) VALUES (?,?,?,?,?,?)", (notification_id, turn_id, action_id, timestamp, content, opportunity_id))
+            self.conn.execute("INSERT INTO notifications (notification_id,turn_id,action_id,at,text,opportunity_id) VALUES (?,?,?,?,?,NULL)", (notification_id, turn_id, action_id, timestamp, content))
         return notification_id
 
     def notifications(self, turn_id: int):
-        return [dict(notification_id=r["notification_id"], action_id=r["action_id"], timestamp=r["at"], text=r["text"], opportunity_id=r["opportunity_id"]) for r in self.conn.execute("SELECT * FROM notifications WHERE turn_id=? ORDER BY rowid", (turn_id,))]
+        return [dict(notification_id=r["notification_id"], action_id=r["action_id"], timestamp=r["at"], text=r["text"]) for r in self.conn.execute("SELECT * FROM notifications WHERE turn_id=? ORDER BY rowid", (turn_id,))]
 
     def record_mcp_action(self, turn_id: int, timestamp: str, tool: str, arguments: dict[str, Any], result: Any, success: bool, error: str | None, changes: dict[str, Any], before=None, after=None, read_only: bool = False, action_id: str | None = None, notification_id: str | None = None):
         """另存 Agent 侧 MCP 调用；失败调用不一定进入权威操作历史。"""

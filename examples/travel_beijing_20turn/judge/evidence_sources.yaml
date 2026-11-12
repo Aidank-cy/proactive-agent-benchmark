@@ -1,0 +1,4 @@
+sources: [goal_context_t, world_pre, world_post, triggering_events, action_trace, tool_results, agent_response, previous_turns, world_history, previous_notifications, opportunities]
+previous_turn_limit: 5
+previous_notification_limit: 20
+world_history_limit: 50

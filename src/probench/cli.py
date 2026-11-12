@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import importlib
+import importlib.util
 import json
 from pathlib import Path
 
@@ -26,7 +27,7 @@ def main():
     execute = commands.add_parser("run")
     execute.add_argument("task_path")
     execute.add_argument("--agent", default="openclaw", help="openclaw, mock, or importable module:Class implementing run_turn")
-    execute.add_argument("--judge", default="openai", choices=["mock", "openai"])
+    execute.add_argument("--judge", default="openai", help="openai, mock, or importable module:Class implementing Judge")
     execute.add_argument("--output", default="runs/example")
     execute.add_argument("--resume", action="store_true", help="continue after the last completed Tick")
     execute.add_argument("--max-ticks", type=int, help="stop after this many newly completed Ticks")
@@ -53,7 +54,23 @@ def main():
             if not separator:
                 parser.error("--agent must be openclaw, mock, or module:Class")
             agent = getattr(importlib.import_module(module_name), class_name)()
-        result = run(task, agent, MockJudge() if args.judge == "mock" else OpenAICompatibleJudge(), Path(args.output), resume=args.resume, max_ticks=args.max_ticks)
+        if args.judge == "mock":
+            judge = MockJudge()
+        elif args.judge == "openai":
+            judge = OpenAICompatibleJudge()
+        else:
+            module_name, separator, class_name = args.judge.partition(":")
+            if not separator:
+                parser.error("--judge must be openai, mock, or module:Class")
+            local_module = task.root / f"{module_name}.py"
+            if "." not in module_name and local_module.is_file():
+                spec = importlib.util.spec_from_file_location(f"probench_task_judge_{module_name}", local_module)
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+            else:
+                module = importlib.import_module(module_name)
+            judge = getattr(module, class_name)()
+        result = run(task, agent, judge, Path(args.output), resume=args.resume, max_ticks=args.max_ticks)
         print(json.dumps(result if result.get("status") == "paused" else {"R_task": result["R_task"], "R_notify": result["R_notify"]}, indent=2))
     else:
         folder = Path(args.run_directory)

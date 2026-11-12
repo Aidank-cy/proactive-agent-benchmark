@@ -75,6 +75,15 @@ class ToolGateway:
     def memory_write(self, name: str, content: str):
         self._workspace.write(name, content)
 
+    def notify_user(self, text: str):
+        """本地测试 Agent 也走模拟收件箱与动作审计，不凭空生成通知。"""
+        action_id = self._world.next_action_id(self._turn_id)
+        notification_id = self._world.notify(self._turn_id, self._timestamp, text, action_id=action_id)
+        result = {"delivered_to": "simulated_user_inbox", "timestamp": self._timestamp, "notification_id": notification_id}
+        self._world.record_mcp_action(self._turn_id, self._timestamp, "notify_user", {"text": text}, result, True, None, {}, action_id=action_id, notification_id=notification_id)
+        self.trace = self._world.mcp_actions(self._turn_id)
+        return result
+
 
 class Agent(Protocol):
     def run_turn(self, observation: dict[str, Any], tools: ToolGateway, history: list[dict[str, Any]]) -> dict[str, Any]: ...
@@ -96,5 +105,7 @@ class MockAgent:
             tools.call(call["adapter"], call["operation"], **call.get("arguments", {}))
         for name, content in step.get("memory", {}).items():
             tools.memory_write(name, content)
+        for item in step.get("proactive_notifications", []):
+            tools.notify_user(item["text"])
         return {"text": step.get("response", ""), "proactive_notifications": step.get("proactive_notifications", [])}
 

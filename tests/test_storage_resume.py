@@ -76,7 +76,7 @@ def test_resume_skips_completed_agent_and_judge_calls(tmp_path):
     assert (path / "evidence_hashes.json").read_bytes() == (tmp_path / "reference/evidence_hashes.json").read_bytes()
     assert verify_evidence(path)
     conn = database(path / "world.db")
-    assert tuple(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in ("ticks", "turns", "judgments", "mcp_actions")) == (4, 4, 8, 3)
+    assert tuple(conn.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] for table in ("ticks", "turns", "judgments", "mcp_actions")) == (4, 4, 8, 4)
     assert json.loads(conn.execute("SELECT payload FROM judgments JOIN judge_inputs USING(input_hash) WHERE tick_id=2 AND kind='notification'").fetchone()[0])["tick"]["tick_id"] == 2
     assert conn.execute("SELECT COUNT(*) FROM judge_inputs").fetchone()[0] <= conn.execute("SELECT COUNT(*) FROM judgments").fetchone()[0]
     assert conn.execute("SELECT COUNT(*) FROM opportunities").fetchone()[0] == 1
@@ -97,6 +97,7 @@ def test_notification_ids_deadline_and_duplicate_are_persisted(tmp_path):
     opportunity = conn.execute("SELECT notification_id,final_score FROM opportunities").fetchone()
     assert opportunity["notification_id"] == notifications[0]["notification_id"]
     assert opportunity["final_score"] == 1
+    assert conn.execute("SELECT notification_id FROM opportunity_notifications").fetchone()[0] == notifications[0]["notification_id"]
     conn.close()
 
     late_task, late_script = fixture()

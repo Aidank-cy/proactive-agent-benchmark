@@ -52,9 +52,18 @@ class RunStore:
                 history_id INTEGER PRIMARY KEY, opportunity_id TEXT NOT NULL, at TEXT NOT NULL,
                 tick_id INTEGER, turn_id INTEGER,
                 from_status TEXT, to_status TEXT NOT NULL, reason TEXT NOT NULL,
-                evidence_refs TEXT NOT NULL, notification_id TEXT, final_score REAL
+                evidence_refs TEXT NOT NULL, notification_id TEXT, final_score REAL,
+                notification_ids TEXT NOT NULL DEFAULT '[]'
+            );
+            CREATE TABLE IF NOT EXISTS opportunity_notifications (
+                notification_id TEXT PRIMARY KEY, opportunity_id TEXT NOT NULL,
+                tick_id INTEGER NOT NULL, turn_id INTEGER NOT NULL
             );
         """)
+        if "notification_ids" not in {row["name"] for row in self.conn.execute("PRAGMA table_info(opportunity_history)")}:
+            self.conn.execute("ALTER TABLE opportunity_history ADD COLUMN notification_ids TEXT NOT NULL DEFAULT '[]'")
+        self.conn.execute("INSERT OR IGNORE INTO opportunity_notifications (notification_id,opportunity_id,tick_id,turn_id) SELECT o.notification_id,o.opportunity_id,COALESCE(h.tick_id,0),COALESCE(h.turn_id,0) FROM opportunities o LEFT JOIN opportunity_history h ON h.opportunity_id=o.opportunity_id AND h.notification_id=o.notification_id WHERE o.notification_id IS NOT NULL")
+        self.conn.commit()
 
     def record_event(self, tick_id: int, ordinal: int, event, result: Any = None, changes: dict | None = None):
         with self.conn:
@@ -150,22 +159,29 @@ class RunStore:
             self.conn.execute("INSERT INTO opportunity_history (opportunity_id,at,tick_id,turn_id,from_status,to_status,reason,evidence_refs) VALUES (?,?,?,?,?,?,?,?)",
                               (item["opportunity_id"], item["created_at"], tick_id, turn_id, None, "OPEN", reason, _dump(refs)))
 
-    def update_opportunity(self, item: dict[str, Any], old_status: str, at: str, reason: str, refs: list[str], notification_id: str | None = None, tick_id: int | None = None, turn_id: int | None = None):
+    def update_opportunity(self, item: dict[str, Any], old_status: str, at: str, reason: str, refs: list[str], notification_ids: list[str] | None = None, tick_id: int | None = None, turn_id: int | None = None):
+        notification_ids = notification_ids or []
+        notification_id = notification_ids[0] if notification_ids else None
         with self.conn:
+            for matched_id in notification_ids:
+                self.conn.execute("INSERT INTO opportunity_notifications VALUES (?,?,?,?)", (matched_id, item["opportunity_id"], tick_id, turn_id))
             self.conn.execute("UPDATE opportunities SET status=?,notification_evidence=?,resolved_at=?,final_score=?,reason=?,notification_id=? WHERE opportunity_id=?",
                               (item["status"], _dump(item["notification_evidence"]), item["resolved_at"], item["final_score"],
                                item["reason"], notification_id, item["opportunity_id"]))
-            self.conn.execute("INSERT INTO opportunity_history (opportunity_id,at,tick_id,turn_id,from_status,to_status,reason,evidence_refs,notification_id,final_score) VALUES (?,?,?,?,?,?,?,?,?,?)",
-                              (item["opportunity_id"], at, tick_id, turn_id, old_status, item["status"], reason, _dump(refs), notification_id, item["final_score"]))
+            self.conn.execute("INSERT INTO opportunity_history (opportunity_id,at,tick_id,turn_id,from_status,to_status,reason,evidence_refs,notification_id,final_score,notification_ids) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+                              (item["opportunity_id"], at, tick_id, turn_id, old_status, item["status"], reason, _dump(refs), notification_id, item["final_score"], _dump(notification_ids)))
 
     def opportunities(self):
+        matches = {}
+        for row in self.conn.execute("SELECT opportunity_id,notification_id FROM opportunity_notifications ORDER BY rowid"):
+            matches.setdefault(row["opportunity_id"], []).append(row["notification_id"])
         return [{**{key: row[key] for key in ("opportunity_id", "task_id", "trigger_event_id", "created_at", "related_goal",
                                             "notification_deadline", "status", "resolved_at", "final_score", "reason", "notification_id")},
-                 "notification_evidence": json.loads(row["notification_evidence"])}
+                 "notification_ids": matches.get(row["opportunity_id"], []), "notification_evidence": json.loads(row["notification_evidence"])}
                 for row in self.conn.execute("SELECT * FROM opportunities ORDER BY rowid")]
 
     def opportunity_history(self):
-        return [{key: json.loads(row[key]) if key == "evidence_refs" else row[key] for key in row.keys()}
+        return [{key: json.loads(row[key]) if key in ("evidence_refs", "notification_ids") else row[key] for key in row.keys()}
                 for row in self.conn.execute("SELECT * FROM opportunity_history ORDER BY history_id")]
 
     def judgments(self, tick_id: int | None = None):

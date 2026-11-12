@@ -131,7 +131,7 @@ def test_updated_goal_can_make_candidate_event_irrelevant(tmp_path):
             active = evidence["goal_context_t"]["disclosures"][-1]["goals"]
             if "Monitoring cancelled." in active:
                 notices = evidence["agent_response"]["proactive_notifications"]
-                return NotificationVerdict(false_notifications=[n["text"] for n in notices], explanation="Current user goal cancelled monitoring; candidate event is irrelevant.", evidence_refs=["goal:context"])
+                return NotificationVerdict(false_notifications=[n["notification_id"] for n in notices], explanation="Current user goal cancelled monitoring; candidate event is irrelevant.", evidence_refs=["goal:context"])
             return super().notification(evidence, rules, opportunities, previous)
 
     result = run(task, MockAgent(script), ConditionalJudge(), tmp_path / "cancelled")
@@ -148,7 +148,6 @@ def test_state_condition_can_create_one_cross_turn_obligation(tmp_path):
     task = load_task(ROOT / "examples/synthetic")
     task.rules[0].trigger_event_ids = []
     script = json.loads((task.root / "mock_agent.json").read_text())
-    script[2]["proactive_notifications"][0]["opportunity_id"] = "material_signal:wake_check"
 
     class StateRuleJudge(MockJudge):
         def notification(self, evidence, rules, opportunities, previous):

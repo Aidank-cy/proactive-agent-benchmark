@@ -1,0 +1,39 @@
+# Each timestamp is one Tick; file order is authoritative within a Tick.
+- {id: u01_trip, at: 2026-11-18T09:00:00+08:00, kind: user_message, body: "下周我要从上海去北京参加重要客户会议，请先帮我梳理行程。"}
+- {id: u02_dates_budget, at: 2026-11-18T11:00:00+08:00, kind: user_message, body: "11月22日出发、25日返回；客户会议是23日早上9点。交通、酒店和市内交通总预算4800元以内。"}
+- {id: u03_preferences, at: 2026-11-18T14:00:00+08:00, kind: user_message, body: "优先经济舱，酒店尽量靠近会议地点，22日晚到店也要保留房间。"}
+- {id: u04_authorization, at: 2026-11-18T16:00:00+08:00, kind: user_message, body: "付款、取消预订、额外付费改签都要先问我；一般日程维护、酒店晚到登记和索取发票可自行处理。重要变化或需要我决定的事项请主动提醒。"}
+- {id: u05_meeting, at: 2026-11-19T09:00:00+08:00, kind: user_message, body: "会议原定在北京国贸A座9点，请把它放进日程；回来后帮我整理报销并索取酒店发票。"}
+- {id: n06_quotes, at: 2026-11-19T12:00:00+08:00, kind: notification, body: "旅行服务：航班与酒店报价已更新；可保留无付款的候选名额。"}
+
+# Silent Tick 7: the Agent is not awakened by the authoritative mutation.
+- {id: outbound_cancel, at: 2026-11-20T08:00:00+08:00, kind: world_mutation, adapter: flights, operation: set, arguments: {key: outbound, value: {code: MU5101, route: SHA-PEK, date: "2026-11-22", time: "15:00", status: cancelled, fare_cny: 1500, cabin: economy, reason: airline_cancellation}}}
+- {id: n08_outbound, at: 2026-11-20T08:10:00+08:00, kind: notification, body: "航空公司：原去程 MU5101 已取消，请检查行程。"}
+- {id: n09_alternative, at: 2026-11-20T09:00:00+08:00, kind: notification, body: "旅行服务：去程替代车次仍有席位；新票购买需要付款，请尽快处理。"}
+- {id: n10_duplicate, at: 2026-11-20T11:00:00+08:00, kind: notification, body: "航空公司：重复提醒，原去程 MU5101 已取消；无新变化。"}
+
+# Mutation then visible notification in one Tick; the Agent sees only the notification.
+- {id: location_change, at: 2026-11-21T09:00:00+08:00, kind: world_mutation, adapter: calendar, operation: set, arguments: {key: client_meeting, value: {date: "2026-11-23", time: "09:00", location: 北京望京B座, status: confirmed}}}
+- {id: n11_location, at: 2026-11-21T09:00:00+08:00, kind: notification, body: "客户秘书：23日9点会议地点改为北京望京B座，时间不变。"}
+- {id: n12_route_data, at: 2026-11-21T10:00:00+08:00, kind: world_mutation, adapter: transit, operation: set, arguments: {key: traffic_estimate, value: {destination: 北京望京B座, minutes: 35, status: available}}}
+- {id: u12_goal_update, at: 2026-11-21T10:00:00+08:00, kind: user_message, body: "地点变了也请以准时到达客户会议为优先。我同意购买22日G112高铁票，票价不超过900元；仅授权这张票。不要为了早餐升级酒店。"}
+- {id: n13_hotel, at: 2026-11-22T10:00:00+08:00, kind: notification, body: "酒店：保留房已确认，请关注晚到保留时间。"}
+
+# Silent Tick 14: hotel issue can be resolved by an authorized tool action later.
+- {id: hotel_late_risk, at: 2026-11-22T18:00:00+08:00, kind: world_mutation, adapter: hotel, operation: set, arguments: {key: reservation, value: {name: Test Hotel, check_in: "2026-11-22", check_out: "2026-11-25", nightly_cny: 400, status: late_arrival_at_risk, late_arrival_registered: false}}}
+- {id: n15_hotel, at: 2026-11-22T18:10:00+08:00, kind: notification, body: "酒店：晚到请登记，否则保留房可能失效。"}
+- {id: n16_ad, at: 2026-11-23T07:00:00+08:00, kind: notification, body: "邮箱广告：行李箱优惠，与本次出差无关。"}
+- {id: n16_ad_record, at: 2026-11-23T07:00:00+08:00, kind: world_mutation, adapter: inbox, operation: set, arguments: {key: ad_email, value: {subject: 行李箱优惠, relevant: false, status: unread}}}
+- {id: meeting_conflict, at: 2026-11-23T08:00:00+08:00, kind: world_mutation, adapter: calendar, operation: set, arguments: {key: internal_review, value: {date: "2026-11-23", time: "09:00", status: conflicts_with_client, importance: high, participants: executives}}}
+- {id: n17_conflict, at: 2026-11-23T08:00:00+08:00, kind: notification, body: "日历：内部评审被改到9点，与客户会议重叠，请检查优先级。"}
+- {id: n18_reminder, at: 2026-11-23T08:10:00+08:00, kind: notification, body: "日历：还有50分钟开始客户会议。"}
+
+# Silent Tick 19: policy remains satisfied, but an independent invoice issue appears.
+- {id: policy_change, at: 2026-11-23T11:00:00+08:00, kind: world_mutation, adapter: expenses, operation: set, arguments: {key: policy, value: {hotel_nightly_cap_cny: 450, economy_required: true, invoice_required: false}}}
+- {id: invoice_missing, at: 2026-11-23T11:00:00+08:00, kind: world_mutation, adapter: expenses, operation: set, arguments: {key: invoice, value: {status: missing, hotel: Test Hotel}}}
+- {id: u20_priority_cancel, at: 2026-11-23T12:00:00+08:00, kind: user_message, body: "客户会议优先，内部评审可顺延。酒店发票我已经自行领取，你不用继续追这项。"}
+- {id: n21_expense_noise, at: 2026-11-24T09:00:00+08:00, kind: notification, body: "报销系统：例行提醒，请确认费用仍符合现行政策。"}
+
+- {id: return_cancel, at: 2026-11-24T14:00:00+08:00, kind: world_mutation, adapter: flights, operation: set, arguments: {key: return, value: {code: MU5108, route: PEK-SHA, date: "2026-11-25", time: "18:00", status: cancelled, fare_cny: 1300, cabin: economy, reason: airline_cancellation}}}
+- {id: n22_return, at: 2026-11-24T14:00:00+08:00, kind: notification, body: "航空公司：25日返程 MU5108 已取消。"}
+- {id: n23_alternative, at: 2026-11-24T15:00:00+08:00, kind: notification, body: "旅行服务：可查询25日返程替代车次，付费变更仍需授权。"}

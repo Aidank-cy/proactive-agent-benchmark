@@ -1,6 +1,6 @@
 # Proactive Agent Benchmark Framework
 
-Reusable infrastructure for long-horizon simulated tasks. The included fixture is synthetic and is only an end-to-end infrastructure check. Task domains and benchmark datasets are intentionally deferred.
+Reusable infrastructure for long-horizon simulated tasks. The domain-neutral fixtures and the Beijing travel Persona fixture are end-to-end infrastructure checks; a production benchmark dataset is intentionally deferred.
 
 ## Architecture
 
@@ -78,6 +78,8 @@ Each run has one `world.db`. The `state` table holds current service state. `his
 
 `judgments` stores each Tick's task/notification verdict, evidence references, and raw LLM output. Its `input_hash` points to `judge_inputs`, which deduplicates identical Judge inputs. `opportunities` stores current obligation state, deadline, linked notification ID, and final score; `opportunity_history` appends creation, pending, and settlement transitions. The common links are `tick_id`, `event_id`, `turn_id`, `action_id`, `notification_id`, and `opportunity_id`. A completed Tick is committed to SQLite immediately after its Judge and opportunity updates. Required-notification scoring still uses one opportunity as its statistical unit; no tool action receives a separate reward.
 
+`notify_user(text)` writes the message to the simulated inbox and returns a generated `notification_id`; the Agent never supplies a Judge-only Opportunity ID. The Notification Judge matches sent message content against active obligations and returns `notification_ids` with every `NOTIFIED` settlement. Python checks that each ID belongs to a successful `notify_user` action in the current Turn, that it meets the deadline, and that no notification satisfies two opportunities. `opportunity_notifications` stores every accepted match, including when several messages jointly satisfy one obligation; `opportunity_history.notification_ids` preserves the IDs at settlement. Judge-reported unnecessary or duplicate notifications use their concrete IDs. The existing notification scoring formula is unchanged.
+
 [`judge_evidence.py`](src/probench/judge_evidence.py) builds the actual Judge API input as `tick`, ordered `events`, `goal_context`, boundary `world_state`, `world_changes`, `actions`, `current_notifications`, `active_opportunities`, and bounded `relevant_history`. It queries only recorded events and changes through the current simulated time, including on a pure mutation Tick. The task-specific evidence source limits still control previous Turn and world-history records. The Judge prompt and both score formulas are unchanged.
 
 To pause at a completed Tick and continue later with the same run directory:
@@ -106,6 +108,10 @@ pytest -q
 ```
 
 For a real Judge set `BENCH_JUDGE_BASE_URL`, `BENCH_JUDGE_API_KEY`, and `BENCH_JUDGE_MODEL`, then choose `--judge openai`. The API must support `/chat/completions` and JSON object response format. OpenClaw is the default Agent; pass `--agent mock` for deterministic local tests or `--agent module:Class` for another runtime. The fixture remains runnable without credentials. Full domain adapters, real task packages, Judge calibration, and production operational deployment are future work.
+
+### Beijing travel Persona test task
+
+[`examples/travel_beijing_20turn`](examples/travel_beijing_20turn/README.md) is a 23-Tick, 20-Turn stress fixture with six travel disruptions, three silent mutation Ticks, five Opportunity lifecycles, incremental user disclosures, and evaluator-only `ground_truth.yaml`. It reuses task-bound KV services; it is not a production travel dataset. Run `bench validate examples/travel_beijing_20turn`, then `bench run examples/travel_beijing_20turn --agent mock --judge fixture_judge:TravelFixtureJudge --output runs/travel-beijing-fixture`. The task-local Judge class is a deterministic engineering test double. `RUN_REAL_TRAVEL_JUDGE=1 pytest -q tests/test_travel_beijing_real_judge.py` is an opt-in semantic check using the independent Judge API credentials; it is skipped without the opt-in flag.
 
 ## Docker and OpenClaw
 

@@ -35,7 +35,7 @@ def _agent_reply(body):
     elif "synthetic_counter_b" in user:
         calls = {1: ("world__counter_read", {}), 2: ("world__counter_read", {})}
     else:
-        calls = {1: ("world__world_set", {"key": "item", "value": 1}), 2: ("world__world_get", {"key": "signal"}), 3: ("world__notify_user", {"text": "The signal changed.", "opportunity_id": "material_signal:change"})}
+        calls = {1: ("world__world_set", {"key": "item", "value": 1}), 2: ("world__world_get", {"key": "signal"}), 3: ("world__notify_user", {"text": "The signal changed."})}
     if turn not in calls:
         return {"role": "assistant", "content": "Routine check complete."}, "stop"
     name, args = calls[turn]

@@ -5,7 +5,7 @@ import hashlib
 import json
 import os
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -163,9 +163,7 @@ def run(task: TaskPackage, agent: Agent, judge: Judge, run_dir: Path, adapters: 
                 # OpenClaw 的工具调用发生在独立 MCP 服务中，从后端审计表取回轨迹。
                 response["proactive_notifications"] = world.notifications(turn_id)
             else:
-                # MockAgent 的脚本通知映射到同一模拟收件箱，便于统一按 ID 评估。
-                for notification in response["proactive_notifications"]:
-                    world.notify(turn_id, timestamp, notification["text"], notification.get("opportunity_id"))
+                # 本地测试 Agent 也必须调用 ToolGateway.notify_user，不能凭响应声明发送。
                 response["proactive_notifications"] = world.notifications(turn_id)
             gateway.trace = world.mcp_actions(turn_id)
             after_memory = workspace.snapshot()
@@ -183,35 +181,54 @@ def run(task: TaskPackage, agent: Agent, judge: Judge, run_dir: Path, adapters: 
             notification_input = getattr(judge, "last_request", None) or judge_input_loader.assemble(evidence, previous, tracker.values())
             notification_raw_output = getattr(judge, "last_raw_output", None)
             current_notifications = {item["notification_id"]: item for item in response["proactive_notifications"]}
-            normalized_false = []
-            for ref in notification_result.false_notifications:
-                if ref in current_notifications:
-                    normalized_false.append(ref)
-                    continue
-                matches = [item["notification_id"] for item in current_notifications.values() if item["text"] == ref]
-                if len(matches) != 1:
-                    raise ValueError(f"Judge cited unknown or ambiguous false notification: {ref}")
-                normalized_false.append(matches[0])
-            notification_result.false_notifications = normalized_false
+            if len(notification_result.false_notifications) != len(set(notification_result.false_notifications)):
+                raise ValueError("Judge repeated a false notification ID")
+            if set(notification_result.false_notifications) - current_notifications.keys():
+                raise ValueError("Judge cited a false notification outside the current Turn")
+            proposed = []
+            candidate_deadlines = {item["opportunity_id"]: item["notification_deadline"] for item in tracker.values() if item["status"] in ("OPEN", "PENDING")}
             for proposal in notification_result.new_opportunities:
                 rule = next((r for r in task.rules if r.id == proposal.rule_id), None)
                 event = next((e for e in pending_events if e.id == proposal.trigger_event_id), None)
                 if rule is None or event is None or (rule.trigger_event_ids and proposal.trigger_event_id not in rule.trigger_event_ids):
                     raise ValueError("judge proposed unknown rule or trigger event")
-                tracker.create(rule, proposal.trigger_event_id, event.at.isoformat(), proposal.explanation, proposal.evidence_refs, tick_id=tick_number, turn_id=turn_id)
+                proposed.append((proposal, rule, event))
+                candidate_id = f"{rule.id}:{event.id}"
+                if candidate_id not in tracker.items:
+                    candidate_deadlines[candidate_id] = (event.at + timedelta(seconds=rule.deadline_seconds)).isoformat()
+            claimed_notifications = set()
+            claimed_opportunities = set()
+            current_actions = {action["action_id"]: action for action in gateway.trace}
             for settlement in notification_result.settled:
-                # 允许 Judge 先看本 Turn 是否已解决问题；逾期通知仍不得算及时。
-                opportunity = next((item for item in tracker.values() if item["opportunity_id"] == settlement.opportunity_id), None)
-                related_notifications = [item["notification_id"] for item in current_notifications.values() if item["opportunity_id"] == settlement.opportunity_id]
-                if opportunity is not None and settlement.status == "NOTIFIED" and settlement.score is not None and settlement.score >= 0 and datetime.fromisoformat(timestamp) > datetime.fromisoformat(opportunity["notification_deadline"]):
+                if settlement.opportunity_id in claimed_opportunities:
+                    raise ValueError(f"Judge settled opportunity twice: {settlement.opportunity_id}")
+                claimed_opportunities.add(settlement.opportunity_id)
+                if set(settlement.notification_ids) - current_notifications.keys():
+                    raise ValueError(f"Judge matched notification outside the current Turn: {settlement.opportunity_id}")
+                if claimed_notifications.intersection(settlement.notification_ids):
+                    raise ValueError("Judge reused one notification for multiple opportunities")
+                claimed_notifications.update(settlement.notification_ids)
+                if settlement.opportunity_id not in candidate_deadlines:
+                    raise ValueError(f"Judge cited unknown opportunity: {settlement.opportunity_id}")
+                if settlement.status == "NOTIFIED" and set(settlement.notification_ids).intersection(notification_result.false_notifications):
+                    raise ValueError("Judge marked a matched notification as false")
+                for notification_id in settlement.notification_ids:
+                    notification = current_notifications[notification_id]
+                    action = current_actions.get(notification["action_id"])
+                    if action is None or action["tool"] != "notify_user" or not action["success"] or action["notification_id"] != notification_id:
+                        raise ValueError(f"notification is not a successful notify_user call in current Turn: {notification_id}")
+                    if store.conn.execute("SELECT 1 FROM opportunity_notifications WHERE notification_id=?", (notification_id,)).fetchone():
+                        raise ValueError(f"notification already matched to an opportunity: {notification_id}")
+                late_ids = [notification_id for notification_id in settlement.notification_ids if datetime.fromisoformat(current_notifications[notification_id]["timestamp"]) > datetime.fromisoformat(candidate_deadlines[settlement.opportunity_id])]
+                if settlement.status == "NOTIFIED" and late_ids:
                     settlement.status = "EXPIRED"
                     settlement.score = 0
                     settlement.reason = "Notification arrived after the allowed deadline."
-                    notification_result.false_notifications.extend(related_notifications)
-                notification_id = related_notifications[0] if settlement.status == "NOTIFIED" and related_notifications else None
-                if settlement.status == "NOTIFIED" and notification_id is None:
-                    raise ValueError(f"Judge settled notification without matching notification ID: {settlement.opportunity_id}")
-                tracker.settle(settlement.opportunity_id, settlement.status, settlement.score, timestamp, settlement.reason, settlement.evidence_refs, notification_id, tick_id=tick_number, turn_id=turn_id)
+                    notification_result.false_notifications.extend(late_ids)
+            for proposal, rule, event in proposed:
+                tracker.create(rule, proposal.trigger_event_id, event.at.isoformat(), proposal.explanation, proposal.evidence_refs, tick_id=tick_number, turn_id=turn_id)
+            for settlement in notification_result.settled:
+                tracker.settle(settlement.opportunity_id, settlement.status, settlement.score, timestamp, settlement.reason, settlement.evidence_refs, settlement.notification_ids, tick_id=tick_number, turn_id=turn_id)
             for item in tracker.active():
                 if datetime.fromisoformat(timestamp) > datetime.fromisoformat(item["notification_deadline"]):
                     tracker.settle(item["opportunity_id"], "EXPIRED", 0, timestamp, "Notification deadline passed.", ["tick:clock"], tick_id=tick_number, turn_id=turn_id)

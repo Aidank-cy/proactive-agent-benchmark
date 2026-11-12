@@ -22,18 +22,20 @@ class OpportunityTracker:
         if oid in self.items:
             return self.items[oid]
         deadline = datetime.fromisoformat(timestamp) + timedelta(seconds=rule.deadline_seconds)
-        item = dict(opportunity_id=oid, task_id=self.task_id, trigger_event_id=event_id, created_at=timestamp, related_goal=rule.related_goal, notification_deadline=deadline.isoformat(), status="OPEN", notification_evidence=[], resolved_at=None, final_score=None, reason=None, notification_id=None)
+        item = dict(opportunity_id=oid, task_id=self.task_id, trigger_event_id=event_id, created_at=timestamp, related_goal=rule.related_goal, notification_deadline=deadline.isoformat(), status="OPEN", notification_evidence=[], resolved_at=None, final_score=None, reason=None, notification_id=None, notification_ids=[])
         self.items[oid] = item
         if self.store:
             self.store.create_opportunity(item, reason, refs or [], tick_id, turn_id)
         return item
 
-    def settle(self, oid: str, status: str, score: float | None, timestamp: str, reason: str, refs: list[str], notification_id: str | None = None, *, tick_id: int | None = None, turn_id: int | None = None):
+    def settle(self, oid: str, status: str, score: float | None, timestamp: str, reason: str, refs: list[str], notification_ids: list[str] | None = None, *, tick_id: int | None = None, turn_id: int | None = None):
         """最终关闭一项义务；已关闭的机会不能再次获得通知分数。
 
         NOTIFIED/EXPIRED 有必需通知分数，RESOLVED/CANCELLED 则仅记录
         关闭原因，不充当必需通知的统计样本。
         """
+        if oid not in self.items:
+            raise ValueError(f"unknown opportunity ID: {oid}")
         item = self.items[oid]
         old_status = item["status"]
         if item["status"] not in ("OPEN", "PENDING"):
@@ -44,18 +46,34 @@ class OpportunityTracker:
             raise ValueError("invalid required notification score")
         if status in ("RESOLVED", "CANCELLED") and score is not None:
             raise ValueError("closed obligations have no score")
-        if notification_id and self.store and not self.store.conn.execute("SELECT 1 FROM notifications WHERE notification_id=?", (notification_id,)).fetchone():
-            raise ValueError(f"unknown notification ID: {notification_id}")
-        item.update(status=status, final_score=score, resolved_at=timestamp, reason=reason, notification_evidence=refs, notification_id=notification_id)
+        notification_ids = notification_ids or []
+        if status == "NOTIFIED" and not notification_ids:
+            raise ValueError("NOTIFIED settlement requires notification IDs")
+        if status in ("RESOLVED", "CANCELLED") and notification_ids:
+            raise ValueError("closed obligation cannot claim notifications")
+        if len(notification_ids) != len(set(notification_ids)):
+            raise ValueError("duplicate notification ID in settlement")
         if self.store:
-            self.store.update_opportunity(item, old_status, timestamp, reason, refs, notification_id, tick_id, turn_id)
+            for notification_id in notification_ids:
+                row = self.store.conn.execute("SELECT n.at,n.turn_id,n.action_id,a.tool,a.success,a.notification_id AS action_notification_id FROM notifications n LEFT JOIN mcp_actions a ON a.action_id=n.action_id WHERE n.notification_id=?", (notification_id,)).fetchone()
+                if row is None or row["turn_id"] != turn_id or row["action_id"] is None or row["tool"] != "notify_user" or not row["success"] or row["action_notification_id"] != notification_id:
+                    raise ValueError(f"notification is not a successful notify_user call in current Turn: {notification_id}")
+                if self.store.conn.execute("SELECT opportunity_id FROM opportunity_notifications WHERE notification_id=?", (notification_id,)).fetchone():
+                    raise ValueError(f"notification already matched to an opportunity: {notification_id}")
+                if status == "NOTIFIED" and datetime.fromisoformat(row["at"]) > datetime.fromisoformat(item["notification_deadline"]):
+                    raise ValueError(f"notification missed deadline: {notification_id}")
+        updated = {**item, "status": status, "final_score": score, "resolved_at": timestamp, "reason": reason, "notification_evidence": refs, "notification_id": notification_ids[0] if notification_ids else None, "notification_ids": notification_ids}
+        if self.store:
+            self.store.update_opportunity(updated, old_status, timestamp, reason, refs, notification_ids, tick_id, turn_id)
+        self.items[oid] = updated
 
     def mark_pending(self, oid: str, timestamp: str, *, tick_id: int | None = None, turn_id: int | None = None):
         item = self.items[oid]
         if item["status"] == "OPEN":
-            item["status"] = "PENDING"
+            updated = {**item, "status": "PENDING"}
             if self.store:
-                self.store.update_opportunity(item, "OPEN", timestamp, "Awaiting notification or resolution.", [], tick_id=tick_id, turn_id=turn_id)
+                self.store.update_opportunity(updated, "OPEN", timestamp, "Awaiting notification or resolution.", [], tick_id=tick_id, turn_id=turn_id)
+            self.items[oid] = updated
 
     def reload(self):
         """在新 Tick 开始时从 SQLite 恢复未结算和已结算机会。"""

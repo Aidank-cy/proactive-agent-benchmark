@@ -46,6 +46,7 @@ class Settlement(BaseModel):
     opportunity_id: str
     status: Literal["NOTIFIED", "RESOLVED", "EXPIRED", "CANCELLED"]
     score: Literal[-1.0, 0.0, 0.5, 1.0] | None = None
+    notification_ids: list[str] = Field(default_factory=list)
     reason: str = Field(min_length=1)
     evidence_refs: list[str] = Field(min_length=1)
 
@@ -53,6 +54,12 @@ class Settlement(BaseModel):
     def check_score(self):
         if (self.status in ("NOTIFIED", "EXPIRED")) != (self.score is not None):
             raise ValueError("settlement score/status mismatch")
+        if self.status == "NOTIFIED" and not self.notification_ids:
+            raise ValueError("NOTIFIED settlement requires notification_ids")
+        if self.status in ("RESOLVED", "CANCELLED") and self.notification_ids:
+            raise ValueError("resolved or cancelled opportunity cannot claim notifications")
+        if len(self.notification_ids) != len(set(self.notification_ids)):
+            raise ValueError("duplicate notification ID in settlement")
         return self
 
 
@@ -181,14 +188,17 @@ class MockJudge:
         proposals = [OpportunityProposal(rule_id=r.id, trigger_event_id=eid, explanation="Configured synthetic trigger occurred.", evidence_refs=[f"event:{eid}", "world:post", "goal:context"]) for r in rules for eid in r.trigger_event_ids if eid in ids]
         notifications = evidence["agent_response"]["proactive_notifications"]
         open_ids = [o["opportunity_id"] for o in opportunities if o["status"] in ("OPEN", "PENDING")]
+        open_ids.extend(f"{item.rule_id}:{item.trigger_event_id}" for item in proposals if f"{item.rule_id}:{item.trigger_event_id}" not in open_ids)
         claimed = set()
         settled = []
         false = []
         for notification in notifications:
-            oid = notification.get("opportunity_id")
-            if oid in open_ids and oid not in claimed:
+            # 仅为合成夹具做确定性匹配；生产 Judge 使用当前世界和完整证据。
+            signal = evidence["world_post"].get("kv", {}).get("signal")
+            oid = next((item for item in open_ids if item not in claimed), None)
+            if oid and signal is not None and notification["text"] == f"The signal {signal}.":
                 claimed.add(oid)
-                settled.append({"opportunity_id": oid, "status": "NOTIFIED", "score": 1.0, "reason": "Synthetic notification matched open opportunity.", "evidence_refs": ["turn:notification"]})
+                settled.append({"opportunity_id": oid, "status": "NOTIFIED", "score": 1.0, "notification_ids": [notification["notification_id"]], "reason": "Synthetic notification matched open opportunity.", "evidence_refs": ["turn:notification"]})
             else:
                 false.append(notification["notification_id"])
         return NotificationVerdict(new_opportunities=proposals, settled=settled, false_notifications=false, explanation="Deterministic fixture notification check.", evidence_refs=["turn:response"])
