@@ -1,0 +1,398 @@
+# IDs are opaque because they are included in Agent observations.
+- id: ev001
+  at: 2026-11-18T09:00:00+08:00
+  kind: user_message
+  body: |
+    下周北京的客户拜访想请你帮我持续看着。旅行部之前已经安排了机票和酒店，
+    但我最近还要盯产品发布，可能顾不上逐条核对。先看看现有资料，重要变化告诉我。
+- id: ev002
+  at: 2026-11-18T10:05:00+08:00
+  kind: world_mutation
+  adapter: email
+  operation: insert
+  arguments:
+    record:
+      id: mail_017
+      kind: email
+      thread_id: thread_release_45
+      message_id: "<release-screenshot-20261118@huachen.example>"
+      folder: INBOX
+      from: "刘思远 <siyuan.liu@huachen.example>"
+      to: ["周宁 <zhou.ning@huachen.example>"]
+      subject: "采购接口回归截图已上传"
+      sent_at: "2026-11-18T10:04:00+08:00"
+      received_at: "2026-11-18T10:05:00+08:00"
+      is_read: false
+      body: |
+        你昨天说的两条告警我已经复现并补了监控截图，文件放在共享盘发布清单下。
+        今天下午的灰度窗口不变，若你看到新的阻塞项请在 14:00 前留言。
+- id: ev003
+  at: 2026-11-18T15:10:00+08:00
+  kind: user_message
+  body: |
+    这次 11 月 22 日从上海出发，25 日回上海；23 日上午 9 点的客户会议我必须参加。
+    交通、住宿和市内交通合在一起尽量不超过 4800 元。如果有明显超预算的方案，先告诉我差额。
+- id: ev004
+  at: 2026-11-19T08:20:00+08:00
+  kind: world_mutation
+  adapter: calendar
+  operation: patch
+  arguments:
+    id: cal_101
+    changes:
+      start_at: "2026-11-23T09:00:00+08:00"
+      end_at: "2026-11-23T10:30:00+08:00"
+      location: "北京市朝阳区建国门外大街 2 号，国贸写字楼 A 座 18F"
+      status: confirmed
+      description: "采购上线计划和接口验收；请从 A 座东门访客入口签到，带身份证。会议室：A1806。"
+      updated_at: "2026-11-19T08:19:00+08:00"
+- id: ev005
+  at: 2026-11-19T08:20:00+08:00
+  kind: world_mutation
+  adapter: email
+  operation: insert
+  arguments:
+    record:
+      id: mail_018
+      kind: email
+      thread_id: thread_client_q4
+      message_id: "<nov-client-visit-final@rongda.example>"
+      folder: INBOX
+      from: "许嘉怡 <jiayi.xu@rongda.example>"
+      to: ["周宁 <zhou.ning@huachen.example>", "李赫 <he.li@huachen.example>"]
+      subject: "23 日客户交流会确认：时间与访客入口"
+      sent_at: "2026-11-19T08:17:00+08:00"
+      received_at: "2026-11-19T08:20:00+08:00"
+      is_read: false
+      in_reply_to: mail_003
+      body: |
+        周宁你好，会议定于 23 日 09:00–10:30，在国贸写字楼 A 座 18 层 A1806。
+        请从东门访客入口签到，携带身份证，预计安检和换证需要 15 分钟。
+        议题仍为采购系统上线排期和接口验收；会前若有变化我再邮件通知。
+- id: ev006
+  at: 2026-11-19T08:20:00+08:00
+  kind: notification
+  body: "邮件提醒｜许嘉怡 <jiayi.xu@rongda.example>｜08:20 收到《23 日客户交流会确认：时间与访客入口》。"
+- id: ev007
+  at: 2026-11-19T12:30:00+08:00
+  kind: user_message
+  body: |
+    机票尽量保持经济舱，酒店不用为了早餐或房型升级额外花钱。付款、取消已有预订、
+    以及产生额外费用的改签都要先征得我同意。一般日程调整、到店晚到登记、
+    索取发票这类不额外收费的事，你可以自己处理。
+- id: ev008
+  at: 2026-11-20T07:10:00+08:00
+  kind: world_mutation
+  adapter: flight
+  operation: patch
+  arguments:
+    id: air_seg_mu5101
+    changes: {status: cancelled_by_carrier, cancellation_reason: aircraft_rotation, updated_at: "2026-11-20T07:08:00+08:00", seats_remaining_in_fare_bucket: 0}
+- id: ev009
+  at: 2026-11-20T07:10:00+08:00
+  kind: world_mutation
+  adapter: flight
+  operation: patch
+  arguments:
+    id: air_order_261116_37
+    changes: {status: disrupted, outbound_cancellation_notice_at: "2026-11-20T07:08:00+08:00", refund_status: pending_carrier_instruction}
+- id: ev010
+  at: 2026-11-20T07:10:00+08:00
+  kind: world_mutation
+  adapter: email
+  operation: insert
+  arguments:
+    record:
+      id: mail_019
+      kind: email
+      thread_id: thread_travel_1122
+      message_id: "<mu5101-cancel-20261120@ceair.example>"
+      folder: INBOX
+      from: "东方航空航班动态 <service@ceair.example>"
+      to: ["周宁 <zhou.ning@huachen.example>"]
+      subject: "航班动态变更｜11 月 22 日 MU5101"
+      sent_at: "2026-11-20T07:08:00+08:00"
+      received_at: "2026-11-20T07:10:00+08:00"
+      is_read: false
+      body: |
+        您订单 HT-261116-37 中 11 月 22 日 MU5101（上海虹桥—北京首都）因航班计划调整取消。
+        返程 MU5108 当前不受本次通知影响。非自愿退改可通过原出票渠道申请，
+        可选航班和免差额条件以旅行部向航司核价的结果为准。请留意订单页面后续状态。
+- id: ev011
+  at: 2026-11-20T08:00:00+08:00
+  kind: notification
+  body: "航班动态｜东方航空 07:10 发送了订单 HT-261116-37 的变更邮件；航班号 MU5101。"
+- id: ev012
+  at: 2026-11-20T11:20:00+08:00
+  kind: world_mutation
+  adapter: flight
+  operation: patch
+  arguments:
+    id: air_option_ca1502
+    changes: {quoted_fare_cny: 1850, seats_remaining: 2, quote_as_of: "2026-11-20T11:18:00+08:00", fare_terms: "可申请非自愿改签，是否免差额须出票渠道确认；余票不锁定。"}
+- id: ev013
+  at: 2026-11-20T11:20:00+08:00
+  kind: world_mutation
+  adapter: email
+  operation: insert
+  arguments:
+    record:
+      id: mail_020
+      kind: email
+      thread_id: thread_travel_1122
+      message_id: "<travel-options-1120@huachen.example>"
+      folder: INBOX
+      from: "陈晓岚 <travel@huachen.example>"
+      to: ["周宁 <zhou.ning@huachen.example>"]
+      subject: "Re: 北京客户拜访：MU5101 航班取消后的处理"
+      sent_at: "2026-11-20T11:18:00+08:00"
+      received_at: "2026-11-20T11:20:00+08:00"
+      is_read: false
+      in_reply_to: mail_001
+      body: |
+        我向出票平台查了几班替代航班。CA1502 中午起飞的经济舱尚有少量座位，
+        平台现在显示的价格比原单高，但还没拿到航司是否免差额的书面答复。
+        晚间到大兴的另一班价格低一些，落地后到酒店路程更长。价格和余票可能继续变，
+        我下午会再核一次；请勿把目前的报价当成已确认的改签结果。
+- id: ev014
+  at: 2026-11-20T15:05:00+08:00
+  kind: notification
+  body: "新邮件｜陈晓岚 <travel@huachen.example>｜主题涉及 MU5101 取消后的替代航班报价。"
+- id: ev015
+  at: 2026-11-21T09:35:00+08:00
+  kind: world_mutation
+  adapter: calendar
+  operation: patch
+  arguments:
+    id: cal_101
+    changes: {location: "北京市朝阳区望京东路 8 号，融达科技 B 座 12F", description: "采购上线计划和接口验收；改从 B 座南门访客入口签到，会议室 B1203。时间仍为 09:00–10:30。", updated_at: "2026-11-21T09:33:00+08:00"}
+- id: ev016
+  at: 2026-11-21T09:35:00+08:00
+  kind: world_mutation
+  adapter: email
+  operation: insert
+  arguments:
+    record:
+      id: mail_021
+      kind: email
+      thread_id: thread_client_q4
+      message_id: "<nov-client-visit-address@rongda.example>"
+      folder: INBOX
+      from: "许嘉怡 <jiayi.xu@rongda.example>"
+      to: ["周宁 <zhou.ning@huachen.example>", "李赫 <he.li@huachen.example>"]
+      subject: "Re: 23 日客户交流会确认：会议室调整"
+      sent_at: "2026-11-21T09:33:00+08:00"
+      received_at: "2026-11-21T09:35:00+08:00"
+      is_read: false
+      in_reply_to: mail_018
+      body: |
+        抱歉临时调整，23 日的会议改到我们望京办公室 B 座 12 层 B1203，
+        地址是望京东路 8 号，09:00 开始的时间不变。访客从 B 座南门登记，
+        原国贸 A 座会议室不再使用。若路上有困难，请联系我办公室电话。
+- id: ev017
+  at: 2026-11-21T11:00:00+08:00
+  kind: notification
+  body: "新邮件｜许嘉怡 <jiayi.xu@rongda.example>｜11:00 收到会议室调整的邮件，日历地点也已更新。"
+- id: ev018
+  at: 2026-11-21T13:10:00+08:00
+  kind: user_message
+  body: |
+    我出差期间不需要为早餐单独加钱；如果酒店能按原订单接待就好。
+    下周产品组的发布风险清单我回来再看，不用和北京这趟行程放在一起提醒。
+- id: ev019
+  at: 2026-11-22T17:05:00+08:00
+  kind: world_mutation
+  adapter: hotel
+  operation: patch
+  arguments:
+    id: hotel_order_hj84
+    changes: {arrival_request_sent_at: "2026-11-22T17:03:00+08:00", updated_at: "2026-11-22T17:03:00+08:00"}
+- id: ev020
+  at: 2026-11-22T17:05:00+08:00
+  kind: world_mutation
+  adapter: email
+  operation: insert
+  arguments:
+    record:
+      id: mail_022
+      kind: email
+      thread_id: thread_hotel_hj84
+      message_id: "<arrival-hj84@jiayu.example>"
+      folder: INBOX
+      from: "望京嘉寓酒店前台 <frontdesk@jiayu.example>"
+      to: ["周宁 <zhou.ning@huachen.example>"]
+      subject: "关于今晚到店时间｜订单 HJ-261116-84"
+      sent_at: "2026-11-22T17:03:00+08:00"
+      received_at: "2026-11-22T17:05:00+08:00"
+      is_read: false
+      body: |
+        周女士您好，您的订单仍为今晚入住。前台看到原航班行程有变，想确认预计到店时间。
+        若 18:00 后到店，请直接回复本邮件或致电前台，我们会在订单里登记晚到。
+        如您已提前登记，请忽略这封自动提醒；房费和房型不因登记晚到而变化。
+- id: ev021
+  at: 2026-11-22T18:00:00+08:00
+  kind: notification
+  body: "酒店邮件｜望京嘉寓酒店前台 17:05 询问订单 HJ-261116-84 的预计到店时间。"
+- id: ev022
+  at: 2026-11-22T20:00:00+08:00
+  kind: notification
+  body: "地图出行｜北京东部城区晚间道路较拥堵；历史路线耗时可能偏短，请以实时路况为准。"
+- id: ev023
+  at: 2026-11-23T07:00:00+08:00
+  kind: world_mutation
+  adapter: calendar
+  operation: patch
+  arguments:
+    id: cal_102
+    changes: {start_at: "2026-11-23T09:00:00+08:00", end_at: "2026-11-23T10:00:00+08:00", updated_at: "2026-11-23T06:58:00+08:00", description: "王总临时把方案评审提前到 09:00，仍支持远程接入；预算和交付边界需要负责人到场说明。"}
+- id: ev024
+  at: 2026-11-23T07:00:00+08:00
+  kind: world_mutation
+  adapter: email
+  operation: insert
+  arguments:
+    record:
+      id: mail_023
+      kind: email
+      thread_id: thread_internal_review
+      message_id: "<review-time-change-1123@huachen.example>"
+      folder: INBOX
+      from: "孟可 <ke.meng@huachen.example>"
+      to: ["周宁 <zhou.ning@huachen.example>", "王总 <wang@huachen.example>"]
+      subject: "今天评审时间调整为 09:00"
+      sent_at: "2026-11-23T06:58:00+08:00"
+      received_at: "2026-11-23T07:00:00+08:00"
+      is_read: false
+      in_reply_to: mail_014
+      body: |
+        王总上午只有 09:00–10:00 有空，因此把原 14:00 的内部方案评审提前了。
+        会议仍可远程参加，但预算和交付边界需要负责人确认；若有人无法参加，
+        请尽快在日历里回复或联系我，以便决定是否改期。
+- id: ev025
+  at: 2026-11-23T07:15:00+08:00
+  kind: notification
+  body: "日历提醒｜内部方案评审的时间已更新；请查看 09:00 时段的日程。"
+- id: ev026
+  at: 2026-11-23T08:00:00+08:00
+  kind: world_mutation
+  adapter: email
+  operation: insert
+  arguments:
+    record:
+      id: mail_024
+      kind: email
+      thread_id: thread_client_q4
+      message_id: "<client-visitor-checkin@rongda.example>"
+      folder: INBOX
+      from: "融达科技访客服务 <visitors@rongda.example>"
+      to: ["周宁 <zhou.ning@huachen.example>"]
+      subject: "今日访客登记信息"
+      sent_at: "2026-11-23T07:58:00+08:00"
+      received_at: "2026-11-23T08:00:00+08:00"
+      is_read: false
+      body: |
+        今日预约已录入 B 座南门访客系统。请携带有效证件，前台建议至少提前十五分钟
+        完成换证。若您临时无法到场，请直接联系会议组织人许嘉怡。
+- id: ev027
+  at: 2026-11-23T08:00:00+08:00
+  kind: notification
+  body: "访客邮件｜融达科技访客服务发送了今日 B 座南门签到信息。"
+- id: ev028
+  at: 2026-11-23T11:05:00+08:00
+  kind: world_mutation
+  adapter: expenses
+  operation: patch
+  arguments:
+    id: policy_domestic_q4
+    changes: {hotel_cap_per_night_cny: 450, effective_from: "2026-11-23", updated_at: "2026-11-23T11:03:00+08:00", note: "新上限适用于尚未提交的北京住宿报销；原始电子发票要求不变。"}
+- id: ev029
+  at: 2026-11-23T11:05:00+08:00
+  kind: world_mutation
+  adapter: email
+  operation: insert
+  arguments:
+    record:
+      id: mail_025
+      kind: email
+      thread_id: thread_finance_policy
+      message_id: "<beijing-rate-1123@huachen.example>"
+      folder: INBOX
+      from: "财务共享中心 <finance@huachen.example>"
+      to: ["全体员工 <all@huachen.example>"]
+      subject: "北京住宿报销上限调整（11 月 23 日起）"
+      sent_at: "2026-11-23T11:03:00+08:00"
+      received_at: "2026-11-23T11:05:00+08:00"
+      is_read: false
+      body: |
+        即日起，北京地区尚未提交的住宿报销按每晚 450 元上限审核。已入住但尚未报销的
+        订单也按新口径处理。电子发票、机票行程单及付款凭证的要求不变。
+        如实际房费高于上限，请在提交前联系部门负责人说明原因；请勿自行修改票据金额。
+- id: ev030
+  at: 2026-11-23T11:05:00+08:00
+  kind: world_mutation
+  adapter: email
+  operation: insert
+  arguments:
+    record:
+      id: mail_026
+      kind: email
+      thread_id: thread_subscription
+      message_id: "<cloud-drive-maint-1123@cloud.example>"
+      folder: INBOX
+      from: "云盘服务 <service@cloud.example>"
+      to: ["周宁 <zhou.ning@huachen.example>"]
+      subject: "今晚云盘照片同步服务维护"
+      sent_at: "2026-11-23T10:58:00+08:00"
+      received_at: "2026-11-23T11:05:00+08:00"
+      is_read: false
+      body: |
+        个人云盘照片同步服务将在今晚 23:00–23:30 维护。已同步文件不受影响，
+        维护期间新照片可能延迟显示。无需进行账户操作。
+- id: ev031
+  at: 2026-11-24T09:20:00+08:00
+  kind: user_message
+  body: |
+    酒店发票我会自己在退房时办理，这件事你不用再追。其他报销材料还是请帮我整理，
+    尤其是机票行程单和实际发生的市内交通费用。
+- id: ev032
+  at: 2026-11-24T14:10:00+08:00
+  kind: world_mutation
+  adapter: flight
+  operation: patch
+  arguments:
+    id: air_seg_mu5108
+    changes: {status: cancelled_by_carrier, cancellation_reason: weather_and_rotation, seats_remaining_in_fare_bucket: 0, updated_at: "2026-11-24T14:08:00+08:00"}
+- id: ev033
+  at: 2026-11-24T14:10:00+08:00
+  kind: world_mutation
+  adapter: flight
+  operation: patch
+  arguments:
+    id: air_order_261116_37
+    changes: {return_cancellation_notice_at: "2026-11-24T14:08:00+08:00", refund_status: carrier_reviewing_both_segments}
+- id: ev034
+  at: 2026-11-24T14:10:00+08:00
+  kind: world_mutation
+  adapter: email
+  operation: insert
+  arguments:
+    record:
+      id: mail_027
+      kind: email
+      thread_id: thread_travel_1122
+      message_id: "<mu5108-cancel-20261124@ceair.example>"
+      folder: INBOX
+      from: "东方航空航班动态 <service@ceair.example>"
+      to: ["周宁 <zhou.ning@huachen.example>"]
+      subject: "航班动态变更｜11 月 25 日 MU5108"
+      sent_at: "2026-11-24T14:08:00+08:00"
+      received_at: "2026-11-24T14:10:00+08:00"
+      is_read: false
+      body: |
+        您原订单 HT-261116-37 中 11 月 25 日 MU5108（北京首都—上海虹桥）已取消。
+        这封邮件仅说明原航段状态，并不表示您已经获得新座位。旅行部正与航司核对
+        非自愿退改、可用舱位及退款安排；请以出票渠道最终确认的信息为准。
+- id: ev035
+  at: 2026-11-24T15:00:00+08:00
+  kind: notification
+  body: "航班动态｜东方航空 14:10 发送了订单 HT-261116-37 中 MU5108 的变更邮件。"

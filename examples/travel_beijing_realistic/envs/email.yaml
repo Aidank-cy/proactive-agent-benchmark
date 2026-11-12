@@ -1,0 +1,250 @@
+mail_001:
+  id: mail_001
+  kind: email
+  thread_id: thread_travel_1122
+  message_id: "<20261116.0942.travel@huachen.example>"
+  folder: INBOX
+  from: "陈晓岚 <travel@huachen.example>"
+  to: ["周宁 <zhou.ning@huachen.example>"]
+  subject: "北京客户拜访：机票及住宿确认信息"
+  sent_at: "2026-11-16T09:42:00+08:00"
+  received_at: "2026-11-16T09:42:18+08:00"
+  is_read: true
+  body: |
+    周宁，按上周五的出差申请，旅行部已出票并保留三晚住宿。去程为 11 月 22 日
+    MU5101（虹桥 T2 至首都 T2，15:00–17:20），返程为 11 月 25 日 MU5108
+    （首都 T2 至虹桥 T2，18:00–20:20）。两张票均为经济舱，订单 HT-261116-37。
+    北京的房间是望京嘉寓酒店大床房，11 月 22 日入住、25 日退房，订单 HJ-261116-84。
+    机票由公司差旅账户结算；酒店到店支付。临时变动请先核实订单状态，差额及
+    退改费用仍以最终供应商规则为准。
+mail_002:
+  id: mail_002
+  kind: email
+  thread_id: thread_travel_1122
+  message_id: "<20261116.1021.zn@huachen.example>"
+  folder: SENT
+  from: "周宁 <zhou.ning@huachen.example>"
+  to: ["陈晓岚 <travel@huachen.example>"]
+  subject: "Re: 北京客户拜访：机票及住宿确认信息"
+  sent_at: "2026-11-16T10:21:00+08:00"
+  received_at: "2026-11-16T10:21:00+08:00"
+  is_read: true
+  in_reply_to: mail_001
+  body: |
+    收到，谢谢。客户会的具体议程还在等对方发来。我这几天会把个人日程理清，
+    若他们更换会场请转给我或直接发到工作邮箱。
+mail_003:
+  id: mail_003
+  kind: email
+  thread_id: thread_client_q4
+  message_id: "<nov-client-visit-1@rongda.example>"
+  folder: INBOX
+  from: "许嘉怡 <jiayi.xu@rongda.example>"
+  to: ["周宁 <zhou.ning@huachen.example>", "李赫 <he.li@huachen.example>"]
+  subject: "下周北京交流会的资料准备"
+  sent_at: "2026-11-13T16:08:00+08:00"
+  received_at: "2026-11-13T16:08:11+08:00"
+  is_read: true
+  body: |
+    周宁你好，下周见面会主要讨论新一轮采购上线计划和接口验收。请带上最新版实施排期，
+    我们会在周中确认会议室和签到方式。上次邮件里提到的旧版排期不要再用于正式讨论。
+mail_004:
+  id: mail_004
+  kind: email
+  thread_id: thread_finance_policy
+  message_id: "<finance-q4-2026@huachen.example>"
+  folder: Archive
+  from: "财务共享中心 <finance@huachen.example>"
+  to: ["全体员工 <all@huachen.example>"]
+  subject: "2026 年第四季度差旅报销口径"
+  sent_at: "2026-11-02T13:30:00+08:00"
+  received_at: "2026-11-02T13:31:04+08:00"
+  is_read: true
+  body: |
+    境内出差机票按经济舱标准报销。住宿按城市级别和实际发票金额核算；北京住宿上限
+    暂为每晚 500 元，不含个人消费。返程后 30 日内提交申请，原始电子发票、行程单
+    和付款凭据应与报销单对应。政策调整以财务后续邮件为准。
+mail_005:
+  id: mail_005
+  kind: email
+  thread_id: thread_hotel_hj84
+  message_id: "<reservation-hj84@jiayu.example>"
+  folder: INBOX
+  from: "望京嘉寓酒店预订部 <reservations@jiayu.example>"
+  to: ["周宁 <zhou.ning@huachen.example>"]
+  subject: "预订确认 HJ-261116-84｜11 月 22 日入住"
+  sent_at: "2026-11-16T11:12:00+08:00"
+  received_at: "2026-11-16T11:12:38+08:00"
+  is_read: true
+  body: |
+    尊敬的周女士，您预订的大床房已确认，11 月 22 日入住、25 日退房，三晚每晚
+    428 元，不含早餐。酒店地址为北京市朝阳区阜通东大街 19 号。当天 18:00 后到店
+    请提前告知前台，以便保留房间；超过 22:00 未确认到店时间，前台可能联系担保人。
+    酒店可在退房后开具电子发票，抬头和税号需另行提供。取消条款见订单记录。
+mail_006:
+  id: mail_006
+  kind: email
+  thread_id: thread_travel_1122
+  message_id: "<eticket-ht37@ceair.example>"
+  folder: INBOX
+  from: "东方航空电子客票 <eticket@ceair.example>"
+  to: ["周宁 <zhou.ning@huachen.example>"]
+  subject: "电子客票行程单｜订单 HT-261116-37"
+  sent_at: "2026-11-16T12:04:00+08:00"
+  received_at: "2026-11-16T12:04:26+08:00"
+  is_read: true
+  body: |
+    旅客 ZHOU/NING，去程 MU5101 和返程 MU5108 已出票。请以航班动态页面显示的
+    起飞时间和航站楼为准；因天气或空域流量产生的调整会另行通知。退改费用按对应
+    票规和实际操作时间计算，机场柜台也可能无法保留原座位。
+mail_007:
+  id: mail_007
+  kind: email
+  thread_id: thread_delivery_3118
+  message_id: "<parcel-3118@sf-express.example>"
+  folder: INBOX
+  from: "顺丰速运 <service@sf-express.example>"
+  to: ["周宁 <zhou.ning@huachen.example>"]
+  subject: "您寄往徐汇区的快件已签收"
+  sent_at: "2026-11-17T18:22:00+08:00"
+  received_at: "2026-11-17T18:23:01+08:00"
+  is_read: false
+  body: |
+    运单 SF148930211 的文件已由前台王师傅签收。若不是本人委托收件，请通过
+    顺丰 App 核对签收凭证；电子回单将在今晚同步。
+mail_008:
+  id: mail_008
+  kind: email
+  thread_id: thread_release_45
+  message_id: "<release-check-45@huachen.example>"
+  folder: INBOX
+  from: "刘思远 <siyuan.liu@huachen.example>"
+  to: ["周宁 <zhou.ning@huachen.example>", "产品组 <product@huachen.example>"]
+  subject: "采购系统 4.5 发布清单请周三前确认"
+  sent_at: "2026-11-17T15:10:00+08:00"
+  received_at: "2026-11-17T15:10:13+08:00"
+  is_read: false
+  body: |
+    我把灰度名单和回滚步骤更新在项目空间里了。周三的发布会仍按 16:00 开始，
+    请各负责人在会前确认自己负责的接口测试结果；遗漏项会留到下一个窗口。
+mail_009:
+  id: mail_009
+  kind: email
+  thread_id: thread_release_45
+  message_id: "<release-check-reply@huachen.example>"
+  folder: SENT
+  from: "周宁 <zhou.ning@huachen.example>"
+  to: ["刘思远 <siyuan.liu@huachen.example>"]
+  subject: "Re: 采购系统 4.5 发布清单请周三前确认"
+  sent_at: "2026-11-17T16:02:00+08:00"
+  received_at: "2026-11-17T16:02:00+08:00"
+  is_read: true
+  in_reply_to: mail_008
+  body: |
+    我负责的采购接口测试已经回归完毕，还有两条可观测性告警需要验证。我会在周三
+    上午把截图发给你，发布窗口暂时不用调整。
+mail_010:
+  id: mail_010
+  kind: email
+  thread_id: thread_building_water
+  message_id: "<water-notice-1120@estate.example>"
+  folder: INBOX
+  from: "小区物业 <notice@estate.example>"
+  to: ["周宁 <zhou.ning@huachen.example>"]
+  subject: "11 月 20 日楼栋供水设备维护通知"
+  sent_at: "2026-11-17T09:20:00+08:00"
+  received_at: "2026-11-17T09:21:00+08:00"
+  is_read: false
+  body: |
+    本周五 09:30 至 11:30 对 B 座二单元供水泵进行检修，施工时水压可能波动。
+    如需协助联系物业值班室，电话可在业主 App 中查看。
+mail_011:
+  id: mail_011
+  kind: email
+  thread_id: thread_parent_visit
+  message_id: "<family-weekend-2026@family.example>"
+  folder: INBOX
+  from: "周明 <zhou.ming@family.example>"
+  to: ["周宁 <zhou.ning@huachen.example>"]
+  subject: "周末探望外婆的安排"
+  sent_at: "2026-11-15T20:40:00+08:00"
+  received_at: "2026-11-15T20:41:08+08:00"
+  is_read: true
+  body: |
+    外婆这周末状态不错，我们周六下午再确认探望时间。你如果出差走不开，
+    我会和妈妈先过去，等你回来再一起吃饭。
+mail_012:
+  id: mail_012
+  kind: email
+  thread_id: thread_appointment_dental
+  message_id: "<dental-appointment-1201@clinic.example>"
+  folder: INBOX
+  from: "衡山口腔诊所 <service@clinic.example>"
+  to: ["周宁 <zhou.ning@huachen.example>"]
+  subject: "12 月 1 日复诊预约确认"
+  sent_at: "2026-11-16T17:30:00+08:00"
+  received_at: "2026-11-16T17:31:16+08:00"
+  is_read: false
+  body: |
+    周女士，您的复诊预约为 12 月 1 日 18:30。请携带上次的牙片报告；如需改期，
+    请至少提前一天在诊所小程序操作。
+mail_013:
+  id: mail_013
+  kind: email
+  thread_id: thread_subscription
+  message_id: "<receipt-cloud-202611@cloud.example>"
+  folder: Archive
+  from: "云盘服务 <billing@cloud.example>"
+  to: ["周宁 <zhou.ning@huachen.example>"]
+  subject: "11 月云盘订阅收据"
+  sent_at: "2026-11-03T08:10:00+08:00"
+  received_at: "2026-11-03T08:11:03+08:00"
+  is_read: true
+  body: |
+    您的个人云盘年度订阅已按原方案续费，收据编号 CP-20261103-77。
+    如需下载增值税电子普通发票，请在订阅页面查询开票记录。
+mail_014:
+  id: mail_014
+  kind: email
+  thread_id: thread_internal_review
+  message_id: "<review-prep-1123@huachen.example>"
+  folder: INBOX
+  from: "孟可 <ke.meng@huachen.example>"
+  to: ["周宁 <zhou.ning@huachen.example>"]
+  subject: "23 日内部方案评审材料"
+  sent_at: "2026-11-17T11:46:00+08:00"
+  received_at: "2026-11-17T11:46:26+08:00"
+  is_read: true
+  body: |
+    评审材料已汇总在共享盘，原计划 23 日 14:00 讨论预算和交付边界。王总会参加，
+    暂时不要对外转发这一版。若会前出现时间变化，日历邀请会同步更新。
+mail_015:
+  id: mail_015
+  kind: email
+  thread_id: thread_bank_card
+  message_id: "<statement-202611@bank.example>"
+  folder: INBOX
+  from: "招商银行信用卡 <notice@bank.example>"
+  to: ["周宁 <zhou.ning@huachen.example>"]
+  subject: "11 月账单已生成"
+  sent_at: "2026-11-17T06:55:00+08:00"
+  received_at: "2026-11-17T06:55:42+08:00"
+  is_read: false
+  body: |
+    您本期信用卡账单已生成，最后还款日为 12 月 8 日。请登录银行 App 查看明细；
+    此邮件不包含具体交易金额，也不会要求您通过邮件提供验证码。
+mail_016:
+  id: mail_016
+  kind: email
+  thread_id: thread_team_weekly
+  message_id: "<team-weekly-20261117@huachen.example>"
+  folder: INBOX
+  from: "赵薇 <wei.zhao@huachen.example>"
+  to: ["周宁 <zhou.ning@huachen.example>"]
+  subject: "周例会纪要与下周待办"
+  sent_at: "2026-11-17T18:05:00+08:00"
+  received_at: "2026-11-17T18:05:19+08:00"
+  is_read: false
+  body: |
+    本周例会纪要已归档。下周请各条线在周三前核对接口联调进度，周五下午发布下一轮
+    风险清单。出差同事如无法参会，可在文档里留言，但不用额外安排补会。

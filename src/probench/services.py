@@ -138,6 +138,84 @@ class CounterAdapter(ServiceBase):
         raise ValueError(f"unsupported or unauthorized operation: {operation}")
 
 
+class RecordState(RootModel[dict[str, dict[str, Any]]]):
+    """A service-local collection keyed by stable record IDs."""
+
+
+class RecordIdArgs(BaseModel):
+    id: str
+
+
+class RecordSearchArgs(BaseModel):
+    query: str = Field(min_length=1)
+
+
+class RecordPatchArgs(BaseModel):
+    id: str
+    changes: dict[str, Any]
+
+
+class RecordInsertArgs(BaseModel):
+    record: dict[str, Any]
+
+
+class RecordAdapter(ServiceBase):
+    """Small reusable record store for task data, without domain-specific policy."""
+
+    name = "records"
+    state_model = RecordState
+    operations = {
+        "list": OperationSpec("list", "List record summaries in this service.", EmptyArgs, False),
+        "search": OperationSpec("search", "Search this service's records by text.", RecordSearchArgs, False),
+        "get": OperationSpec("get", "Read a record by its ID.", RecordIdArgs, False),
+        "patch": OperationSpec("patch", "Update fields on an existing record.", RecordPatchArgs, True),
+        "create": OperationSpec("create", "Create a new service record.", RecordInsertArgs, True),
+        "insert": OperationSpec("insert", "Insert a new external record (world controller only).", RecordInsertArgs, True, agent_visible=False),
+    }
+
+    def __init__(self, config: dict[str, Any] | None = None):
+        if config:
+            raise ValueError("records service has no configuration options")
+
+    def validate_state(self, state: dict[str, Any]) -> dict[str, Any]:
+        normalized = super().validate_state(state)
+        for record_id, record in normalized.items():
+            if record.get("id") != record_id:
+                raise ValueError(f"record ID mismatch: {record_id}")
+        return normalized
+
+    @staticmethod
+    def _summary(record: dict[str, Any]) -> dict[str, Any]:
+        fields = ("id", "kind", "subject", "title", "name", "code", "status", "sent_at", "start_at", "updated_at")
+        return {key: record[key] for key in fields if key in record}
+
+    def execute(self, state, operation, arguments, *, mutate):
+        if operation == "list":
+            return [self._summary(record) for record in state.values()], {}
+        if operation == "search":
+            query = arguments["query"].casefold()
+            return [self._summary(record) for record in state.values() if query in json.dumps(record, ensure_ascii=False, default=str).casefold()], {}
+        if operation == "get":
+            return copy.deepcopy(state.get(arguments["id"])), {}
+        if operation == "patch" and mutate:
+            record_id, changes = arguments["id"], arguments["changes"]
+            if record_id not in state:
+                raise ValueError(f"record does not exist: {record_id}")
+            if "id" in changes:
+                raise ValueError("record ID is immutable")
+            before = copy.deepcopy(state[record_id])
+            state[record_id].update(copy.deepcopy(changes))
+            return {"before": before, "after": copy.deepcopy(state[record_id])}, {record_id: copy.deepcopy(changes)}
+        if operation in ("create", "insert") and mutate:
+            record = copy.deepcopy(arguments["record"])
+            record_id = record.get("id")
+            if not isinstance(record_id, str) or not record_id or record_id in state:
+                raise ValueError(f"invalid or existing record ID: {record_id}")
+            state[record_id] = record
+            return {"inserted_id": record_id}, {record_id: record}
+        raise ValueError(f"unsupported or unauthorized operation: {operation}")
+
+
 class ServiceRegistry:
     """保存服务工厂；任务选择服务名，而非复制服务实现。"""
 
@@ -162,6 +240,7 @@ class ServiceRegistry:
 DEFAULT_REGISTRY = ServiceRegistry()
 DEFAULT_REGISTRY.register("kv", KVAdapter)
 DEFAULT_REGISTRY.register("counter", CounterAdapter)
+DEFAULT_REGISTRY.register("records", RecordAdapter)
 
 
 def load_service_modules():

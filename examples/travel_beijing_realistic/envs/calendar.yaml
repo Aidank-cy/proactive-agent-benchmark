@@ -1,0 +1,149 @@
+cal_101:
+  id: cal_101
+  kind: calendar_event
+  calendar: Work
+  title: "北京客户交流预留"
+  description: "客户采购上线计划讨论。具体会议室与签到安排等许嘉怡最终邮件；旅行部已按本周申请安排交通。"
+  start_at: null
+  end_at: null
+  date: "2026-11-23"
+  location: "北京，待对方确认"
+  attendees: ["周宁 <zhou.ning@huachen.example>", "许嘉怡 <jiayi.xu@rongda.example>", "李赫 <he.li@huachen.example>"]
+  status: tentative
+  created_at: "2026-11-13T17:00:00+08:00"
+  updated_at: "2026-11-13T17:00:00+08:00"
+  source_message_id: mail_003
+cal_102:
+  id: cal_102
+  kind: calendar_event
+  calendar: Work
+  title: "内部方案评审"
+  description: "王总和产品、实施团队讨论预算口径与交付边界；材料在共享盘，会议通知由孟可维护。"
+  start_at: "2026-11-23T14:00:00+08:00"
+  end_at: "2026-11-23T15:00:00+08:00"
+  location: "上海总部 A 座 6F，支持远程接入"
+  attendees: ["周宁 <zhou.ning@huachen.example>", "孟可 <ke.meng@huachen.example>", "王总 <wang@huachen.example>"]
+  status: confirmed
+  created_at: "2026-11-17T11:55:00+08:00"
+  updated_at: "2026-11-17T11:55:00+08:00"
+  source_message_id: mail_014
+cal_103:
+  id: cal_103
+  kind: calendar_event
+  calendar: Work
+  title: "采购接口联调例会"
+  description: "固定查看联调阻塞与风险项；无法到场可在共享文档留言。"
+  start_at: "2026-11-19T10:00:00+08:00"
+  end_at: "2026-11-19T10:45:00+08:00"
+  location: "上海总部 3F / 腾讯会议"
+  attendees: ["周宁 <zhou.ning@huachen.example>", "刘思远 <siyuan.liu@huachen.example>"]
+  recurrence_rule: "FREQ=WEEKLY;BYDAY=TH"
+  status: confirmed
+  created_at: "2026-08-20T09:10:00+08:00"
+  updated_at: "2026-10-29T10:50:00+08:00"
+cal_104:
+  id: cal_104
+  kind: calendar_event
+  calendar: Work
+  title: "采购系统 4.5 灰度发布确认"
+  description: "核对接口回归截图和回滚联系人，发布窗口按产品组最终通知执行。"
+  start_at: "2026-11-18T16:00:00+08:00"
+  end_at: "2026-11-18T17:00:00+08:00"
+  location: "腾讯会议"
+  attendees: ["周宁 <zhou.ning@huachen.example>", "刘思远 <siyuan.liu@huachen.example>"]
+  status: confirmed
+  created_at: "2026-11-15T17:10:00+08:00"
+  updated_at: "2026-11-17T15:12:00+08:00"
+cal_105:
+  id: cal_105
+  kind: calendar_event
+  calendar: Personal
+  title: "给妈妈打电话"
+  description: "商量周末探望外婆的时间；若出差来不及可以下周再约。"
+  start_at: "2026-11-20T20:30:00+08:00"
+  end_at: "2026-11-20T21:00:00+08:00"
+  location: "电话"
+  attendees: ["周宁", "周明"]
+  status: confirmed
+  created_at: "2026-11-16T21:00:00+08:00"
+  updated_at: "2026-11-16T21:00:00+08:00"
+cal_106:
+  id: cal_106
+  kind: calendar_event
+  calendar: Personal
+  title: "衡山口腔复诊"
+  description: "带上次牙片报告，提前一天才能在小程序免费改期。"
+  start_at: "2026-12-01T18:30:00+08:00"
+  end_at: "2026-12-01T19:15:00+08:00"
+  location: "上海市徐汇区衡山路 108 号"
+  attendees: ["周宁"]
+  status: confirmed
+  created_at: "2026-11-16T17:35:00+08:00"
+  updated_at: "2026-11-16T17:35:00+08:00"
+cal_107:
+  id: cal_107
+  kind: calendar_event
+  calendar: Personal
+  title: "慢跑"
+  description: "下雨时改为室内拉伸，不与工作会议绑定。"
+  start_at: "2026-11-19T19:30:00+08:00"
+  end_at: "2026-11-19T20:15:00+08:00"
+  location: "徐汇滨江"
+  attendees: ["周宁"]
+  recurrence_rule: "FREQ=WEEKLY;BYDAY=TU,TH"
+  status: confirmed
+  created_at: "2026-09-03T08:00:00+08:00"
+  updated_at: "2026-09-03T08:00:00+08:00"
+cal_108:
+  id: cal_108
+  kind: calendar_event
+  calendar: Work
+  title: "与财务核对十月报销单"
+  description: "核对上个月苏州现场项目两张交通票据的抬头与费用归属。"
+  start_at: "2026-11-18T11:30:00+08:00"
+  end_at: "2026-11-18T12:00:00+08:00"
+  location: "上海总部 2F 财务窗口"
+  attendees: ["周宁", "财务共享中心"]
+  status: confirmed
+  created_at: "2026-11-14T10:45:00+08:00"
+  updated_at: "2026-11-14T10:45:00+08:00"
+cal_109:
+  id: cal_109
+  kind: calendar_event
+  calendar: Work
+  title: "周五项目风险清单发布"
+  description: "产品组发下一轮风险清单；出差期间可异步审核，不需要单独开会。"
+  start_at: "2026-11-27T15:00:00+08:00"
+  end_at: "2026-11-27T15:30:00+08:00"
+  location: "共享文档"
+  attendees: ["周宁", "赵薇"]
+  recurrence_rule: "FREQ=WEEKLY;BYDAY=FR"
+  status: confirmed
+  created_at: "2026-11-17T18:10:00+08:00"
+  updated_at: "2026-11-17T18:10:00+08:00"
+cal_110:
+  id: cal_110
+  kind: calendar_event
+  calendar: Personal
+  title: "家中水泵检修"
+  description: "物业通知二单元 09:30–11:30 水压可能波动；若家中无人，出门前关好水龙头。"
+  start_at: "2026-11-20T09:30:00+08:00"
+  end_at: "2026-11-20T11:30:00+08:00"
+  location: "上海住处"
+  attendees: ["周宁"]
+  status: confirmed
+  created_at: "2026-11-17T09:25:00+08:00"
+  updated_at: "2026-11-17T09:25:00+08:00"
+cal_111:
+  id: cal_111
+  kind: calendar_event
+  calendar: Work
+  title: "季度采购工作坊回顾"
+  description: "内部分享上季度采购流程改进，不要求本人现场参与。"
+  start_at: "2026-11-26T10:00:00+08:00"
+  end_at: "2026-11-26T11:00:00+08:00"
+  location: "线上"
+  attendees: ["周宁", "采购运营组"]
+  status: tentative
+  created_at: "2026-11-12T14:40:00+08:00"
+  updated_at: "2026-11-12T14:40:00+08:00"

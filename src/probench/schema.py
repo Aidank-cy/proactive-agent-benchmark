@@ -163,6 +163,11 @@ def load_task(path: str | Path, registry: ServiceRegistry = DEFAULT_REGISTRY) ->
     root = Path(path).resolve()
     manifest = Manifest.model_validate(_read(root, "manifest.yaml"))
     world = _read(root, manifest.initial_world) or {}
+    # Large tasks may keep each service's seed in a separate file under the task root.
+    # The marker is explicit, so an ordinary state object is never mistaken for a path.
+    for service_name, data in list(world.items()):
+        if isinstance(data, dict) and set(data) == {"$include"}:
+            world[service_name] = _read(root, data["$include"])
     events = [Event.model_validate(x) for x in (_read(root, manifest.events) or [])]
     contexts = [ContextDisclosure.model_validate(x) for x in (_read(root, manifest.context) or [])]
     rules = [NotificationRule.model_validate(x) for x in (_read(root, manifest.notification_rules) or [])]

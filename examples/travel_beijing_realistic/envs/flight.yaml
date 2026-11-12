@@ -1,0 +1,116 @@
+air_order_261116_37:
+  id: air_order_261116_37
+  kind: booking
+  provider_order_id: HT-261116-37
+  passenger: ZHOU/NING
+  booked_by: "华辰旅行部"
+  created_at: "2026-11-16T09:35:00+08:00"
+  payment_channel: corporate_travel_account
+  status: ticketed
+  outbound_flight_id: air_seg_mu5101
+  return_flight_id: air_seg_mu5108
+  total_fare_cny: 2790
+  change_policy: "改签以原舱位余票和当日票价为准；若产生差额，由旅行部另行核价。"
+  cancellation_policy: "自愿退票按票规收取手续费；航司取消时可申请非自愿退改。"
+  contact_email_id: mail_001
+air_seg_mu5101:
+  id: air_seg_mu5101
+  kind: flight_segment
+  booking_id: air_order_261116_37
+  code: MU5101
+  carrier: "中国东方航空"
+  origin: SHA
+  destination: PEK
+  departure_at: "2026-11-22T15:00:00+08:00"
+  arrival_at: "2026-11-22T17:20:00+08:00"
+  terminal_departure: "虹桥 T2"
+  terminal_arrival: "首都 T2"
+  cabin: economy
+  fare_cny: 1460
+  ticket_number: "781-5930421187"
+  status: scheduled
+  seats_remaining_in_fare_bucket: 4
+  updated_at: "2026-11-17T07:00:00+08:00"
+air_seg_mu5108:
+  id: air_seg_mu5108
+  kind: flight_segment
+  booking_id: air_order_261116_37
+  code: MU5108
+  carrier: "中国东方航空"
+  origin: PEK
+  destination: SHA
+  departure_at: "2026-11-25T18:00:00+08:00"
+  arrival_at: "2026-11-25T20:20:00+08:00"
+  terminal_departure: "首都 T2"
+  terminal_arrival: "虹桥 T2"
+  cabin: economy
+  fare_cny: 1330
+  ticket_number: "781-5930421188"
+  status: scheduled
+  seats_remaining_in_fare_bucket: 6
+  updated_at: "2026-11-17T07:00:00+08:00"
+air_option_ca1502:
+  id: air_option_ca1502
+  kind: inventory
+  code: CA1502
+  carrier: "中国国际航空"
+  origin: SHA
+  destination: PEK
+  departure_at: "2026-11-22T12:20:00+08:00"
+  arrival_at: "2026-11-22T14:40:00+08:00"
+  cabin: economy
+  quoted_fare_cny: 1760
+  seats_remaining: 5
+  quote_as_of: "2026-11-17T08:00:00+08:00"
+  fare_terms: "出票前价格和座位可能变化；非自愿改签能否免差额需航司确认。"
+air_option_ho1256:
+  id: air_option_ho1256
+  kind: inventory
+  code: HO1256
+  carrier: "吉祥航空"
+  origin: PVG
+  destination: PKX
+  departure_at: "2026-11-22T19:35:00+08:00"
+  arrival_at: "2026-11-22T21:55:00+08:00"
+  cabin: economy
+  quoted_fare_cny: 990
+  seats_remaining: 8
+  quote_as_of: "2026-11-17T08:00:00+08:00"
+  fare_terms: "从浦东出发、抵达大兴；夜间到店和次日会场交通需另核。"
+air_option_mu5122:
+  id: air_option_mu5122
+  kind: inventory
+  code: MU5122
+  carrier: "中国东方航空"
+  origin: PEK
+  destination: SHA
+  departure_at: "2026-11-25T20:10:00+08:00"
+  arrival_at: "2026-11-25T22:30:00+08:00"
+  cabin: economy
+  quoted_fare_cny: 1460
+  seats_remaining: 3
+  quote_as_of: "2026-11-17T08:00:00+08:00"
+  fare_terms: "报价仅供参考；公司账户付款和改签差额需旅行部再次确认。"
+air_order_260904_18:
+  id: air_order_260904_18
+  kind: booking
+  provider_order_id: HT-260904-18
+  passenger: ZHOU/NING
+  route: "上海虹桥—深圳宝安往返"
+  travel_window: "2026-09-08 至 2026-09-10"
+  status: completed
+  total_fare_cny: 1890
+  created_at: "2026-09-04T16:18:00+08:00"
+  expense_claim_id: claim_2609_sz
+air_order_260731_09:
+  id: air_order_260731_09
+  kind: booking
+  provider_order_id: HT-260731-09
+  passenger: ZHOU/NING
+  route: "上海虹桥—杭州萧山单程"
+  travel_window: "2026-08-03"
+  status: cancelled_by_traveler
+  total_fare_cny: 680
+  refund_cny: 580
+  created_at: "2026-07-31T12:20:00+08:00"
+  updated_at: "2026-08-01T18:10:00+08:00"

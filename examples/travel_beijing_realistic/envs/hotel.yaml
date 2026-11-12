@@ -1,0 +1,83 @@
+hotel_order_hj84:
+  id: hotel_order_hj84
+  kind: reservation
+  provider_order_id: HJ-261116-84
+  property_id: hotel_jiayu_wj
+  guest_name: "周宁"
+  room_type: "高级大床房"
+  check_in: "2026-11-22"
+  check_out: "2026-11-25"
+  nightly_rate_cny: 428
+  nights: 3
+  taxes_included: true
+  breakfast_included: false
+  payment_method: pay_at_property
+  status: confirmed
+  late_arrival_registered: false
+  guaranteed_until: "2026-11-22T18:00:00+08:00"
+  cancellation_policy: "11 月 21 日 18:00 前免费取消；之后取消或未到店收取首晚房费。"
+  contact_phone: "010-6438-2016"
+  created_at: "2026-11-16T11:00:00+08:00"
+  updated_at: "2026-11-16T11:00:00+08:00"
+  confirmation_email_id: mail_005
+hotel_jiayu_wj:
+  id: hotel_jiayu_wj
+  kind: property
+  name: "望京嘉寓酒店"
+  district: "朝阳区望京"
+  address: "北京市朝阳区阜通东大街 19 号"
+  geo: {lat: 39.9952, lng: 116.4758}
+  front_desk_hours: "24 小时；晚到需提前报备"
+  check_in_from: "14:00"
+  check_out_before: "12:00"
+  room_inventory: {superior_king: 3, business_twin: 2}
+  facilities: ["无线网络", "行李寄存", "24 小时前台", "自助洗衣"]
+  updated_at: "2026-11-17T08:00:00+08:00"
+hotel_riverpark:
+  id: hotel_riverpark
+  kind: property
+  name: "北京河畔商务酒店"
+  district: "朝阳区国贸"
+  address: "北京市朝阳区东三环中路 29 号"
+  geo: {lat: 39.9064, lng: 116.4621}
+  check_in_from: "14:00"
+  front_desk_hours: "24 小时"
+  rate_quote_cny: 468
+  room_inventory: {standard_king: 5, business_twin: 1}
+  cancellation_policy: "入住前一日 18:00 前免费取消，预付特惠价不可退。"
+  updated_at: "2026-11-17T08:00:00+08:00"
+hotel_haidian:
+  id: hotel_haidian
+  kind: property
+  name: "中关村瑞庭公寓酒店"
+  district: "海淀区中关村"
+  address: "北京市海淀区知春路 68 号"
+  geo: {lat: 39.9791, lng: 116.3452}
+  check_in_from: "15:00"
+  front_desk_hours: "07:00–23:00"
+  rate_quote_cny: 398
+  room_inventory: {studio: 6}
+  cancellation_policy: "到店前三天可免费取消，超过时限收取一晚房费。"
+  updated_at: "2026-11-17T08:00:00+08:00"
+hotel_order_sz09:
+  id: hotel_order_sz09
+  kind: reservation
+  provider_order_id: HJ-260904-31
+  property_name: "深圳南山滨海酒店"
+  check_in: "2026-09-08"
+  check_out: "2026-09-10"
+  status: completed
+  nightly_rate_cny: 389
+  invoice_number: "044002600211884"
+  expense_claim_id: claim_2609_sz
+  created_at: "2026-09-04T16:45:00+08:00"
+hotel_order_hz08:
+  id: hotel_order_hz08
+  kind: reservation
+  provider_order_id: HJ-260731-12
+  property_name: "杭州西溪商旅酒店"
+  check_in: "2026-08-03"
+  check_out: "2026-08-04"
+  status: cancelled
+  refund_cny: 320
+  updated_at: "2026-08-01T18:20:00+08:00"

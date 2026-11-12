@@ -1,0 +1,85 @@
+policy_domestic_q4:
+  id: policy_domestic_q4
+  kind: policy
+  title: "2026 Q4 境内差旅报销细则"
+  effective_from: "2026-10-01"
+  city: 北京
+  hotel_cap_per_night_cny: 500
+  cabin_limit: economy
+  receipt_rule: "住宿提供电子发票；机票行程单与付款凭证应能对应订单。"
+  submission_deadline_days_after_return: 30
+  exclusions: ["私人消费", "客房升级", "非工作用餐"]
+  source_email_id: mail_004
+  updated_at: "2026-11-02T13:30:00+08:00"
+trip_request_bj_26:
+  id: trip_request_bj_26
+  kind: travel_request
+  request_number: TR-2026-1122-08
+  traveler: 周宁
+  destination: 北京
+  purpose: "客户采购上线计划沟通"
+  travel_start: "2026-11-22"
+  travel_end: "2026-11-25"
+  status: approved_by_department
+  approved_at: "2026-11-13T15:30:00+08:00"
+  note: "部门已确认客户拜访事由和预计出行日期；后续行程变更按差旅制度办理。"
+trip_costs_bj_26:
+  id: trip_costs_bj_26
+  kind: estimate
+  title: "北京客户拜访已确认费用与预估市内交通"
+  flight_order_id: air_order_261116_37
+  hotel_order_id: hotel_order_hj84
+  air_fare_cny: 2790
+  hotel_estimate_cny: 1284
+  local_transit_estimate_cny: 260
+  total_estimate_cny: 4334
+  currency: CNY
+  updated_at: "2026-11-16T13:10:00+08:00"
+receipt_air_ht37:
+  id: receipt_air_ht37
+  kind: receipt
+  title: "北京行程电子客票行程单"
+  order_id: air_order_261116_37
+  amount_cny: 2790
+  status: available
+  issued_at: "2026-11-16T12:04:00+08:00"
+  document_number: "HT-261116-37"
+receipt_hotel_hj84:
+  id: receipt_hotel_hj84
+  kind: receipt_request
+  title: "望京嘉寓酒店住宿发票"
+  order_id: hotel_order_hj84
+  status: can_request_after_checkout
+  invoice_title: "华辰科技（上海）有限公司"
+  tax_id: "91310000MA1G8N4P6Q"
+  note: "酒店只在退房后开具，抬头税号已存于公司报销资料。"
+  updated_at: "2026-11-16T11:15:00+08:00"
+claim_2609_sz:
+  id: claim_2609_sz
+  kind: claim
+  title: "九月深圳实施现场差旅"
+  traveler: 周宁
+  status: reimbursed
+  submitted_at: "2026-09-15T10:10:00+08:00"
+  reimbursed_at: "2026-10-09T16:00:00+08:00"
+  total_cny: 3526
+  flight_order_id: air_order_260904_18
+  hotel_order_id: hotel_order_sz09
+claim_2610_suzhou:
+  id: claim_2610_suzhou
+  kind: claim
+  title: "十月苏州项目现场交通"
+  traveler: 周宁
+  status: awaiting_receipt_correction
+  submitted_at: "2026-11-04T14:20:00+08:00"
+  total_cny: 418
+  note: "两张市内交通票据抬头待财务确认；财务共享中心将在下次审核批次回复。"
+card_entry_261103:
+  id: card_entry_261103
+  kind: personal_expense
+  title: "个人云盘续费"
+  paid_at: "2026-11-03T08:05:00+08:00"
+  amount_cny: 198
+  payment_method: personal_credit_card
+  status: settled
+  receipt_email_id: mail_013

@@ -1,0 +1,28 @@
+task_id: travel_beijing_realistic
+metadata:
+  description: "Shanghai resident's ordinary work and personal environment during a Beijing business trip"
+initial_timestamp: 2026-11-18T09:00:00+08:00
+duration_seconds: 777600
+services:
+  - {id: email, service: records}
+  - {id: calendar, service: records}
+  - {id: flight, service: records}
+  - {id: hotel, service: records}
+  - {id: transit, service: records}
+  - {id: expenses, service: records}
+workspace_files: {}
+tool_permissions:
+  email: [list, search, get, patch, create]
+  calendar: [list, search, get, patch, create]
+  flight: [list, search, get, patch, create]
+  hotel: [list, search, get, patch]
+  transit: [list, search, get]
+  expenses: [list, search, get, patch, create]
+judge:
+  completion_policy: expire
+initial_world: initial_world.yaml
+events: events.yaml
+context: context.yaml
+notification_rules: judge/notification_rules.yaml
+judge_instructions: judge/instructions.md
+evidence_sources: judge/evidence_sources.yaml

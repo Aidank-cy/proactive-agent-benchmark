@@ -1,0 +1,6 @@
+email: {$include: envs/email.yaml}
+calendar: {$include: envs/calendar.yaml}
+flight: {$include: envs/flight.yaml}
+hotel: {$include: envs/hotel.yaml}
+transit: {$include: envs/transit.yaml}
+expenses: {$include: envs/expenses.yaml}

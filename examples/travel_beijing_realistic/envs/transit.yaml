@@ -1,0 +1,90 @@
+route_pek_wangjing_rail:
+  id: route_pek_wangjing_rail
+  kind: route
+  title: "首都机场 T2 至望京"
+  origin: "首都机场 T2"
+  destination: "望京南站附近"
+  mode: "机场线 + 地铁 10/13 号线"
+  estimated_minutes: 68
+  fare_cny: 32
+  service_window: "06:30–22:30"
+  notes: "需要在三元桥换乘；晚高峰和大件行李会增加步行时间。"
+  updated_at: "2026-11-17T18:00:00+08:00"
+route_pek_wangjing_taxi:
+  id: route_pek_wangjing_taxi
+  kind: route
+  title: "首都机场 T2 至望京嘉寓酒店"
+  origin: "首都机场 T2"
+  destination: "北京市朝阳区阜通东大街 19 号"
+  mode: taxi
+  estimated_minutes: 48
+  estimated_fare_cny: 115
+  notes: "晚间路况波动较大，网约车上车点在停车楼 B1 层。"
+  updated_at: "2026-11-17T18:00:00+08:00"
+route_hotel_guomao:
+  id: route_hotel_guomao
+  kind: route
+  title: "望京至国贸写字楼区"
+  origin: "望京嘉寓酒店"
+  destination: "国贸地铁站周边"
+  mode: "地铁 14 号线换乘 10 号线"
+  estimated_minutes: 43
+  fare_cny: 5
+  notes: "早高峰地铁排队和大楼安检需另留余量。"
+  updated_at: "2026-11-17T18:00:00+08:00"
+route_hotel_wangjing:
+  id: route_hotel_wangjing
+  kind: route
+  title: "望京嘉寓酒店至望京商务区"
+  origin: "望京嘉寓酒店"
+  destination: "望京商务区"
+  mode: "步行或短途出租车"
+  estimated_minutes: 22
+  estimated_fare_cny: 22
+  notes: "具体楼宇未确定时仅为片区估时，晨间路口需遵守信号灯。"
+  updated_at: "2026-11-17T18:00:00+08:00"
+route_pek_sha_hotel:
+  id: route_pek_sha_hotel
+  kind: route
+  title: "首都机场到市区酒店的夜间备选"
+  origin: "首都机场 T2"
+  destination: "北京东部城区"
+  mode: "机场巴士 3 线"
+  estimated_minutes: 85
+  fare_cny: 30
+  service_window: "19:00–23:00"
+  notes: "夜间班次约半小时一班，末班与实际运营公告有关。"
+  updated_at: "2026-11-17T18:00:00+08:00"
+route_sha_home:
+  id: route_sha_home
+  kind: route
+  title: "虹桥机场至徐汇住处"
+  origin: "虹桥机场 T2"
+  destination: "徐汇区漕溪北路"
+  mode: "地铁 10 号线转 1 号线"
+  estimated_minutes: 56
+  fare_cny: 5
+  notes: "末班地铁时间依当日运营公告；到达 22:30 后建议重新查询。"
+  updated_at: "2026-11-17T18:00:00+08:00"
+route_hq_station:
+  id: route_hq_station
+  kind: route
+  title: "上海住处至虹桥火车站"
+  origin: "徐汇区漕溪北路"
+  destination: "上海虹桥站"
+  mode: "地铁 10 号线"
+  estimated_minutes: 47
+  fare_cny: 5
+  notes: "工作日中午进站安检通常比早高峰短；铁路车次仍需按实际检票口核对。"
+  updated_at: "2026-11-17T18:00:00+08:00"
+route_beijing_south_hotel:
+  id: route_beijing_south_hotel
+  kind: route
+  title: "北京南站至望京嘉寓酒店"
+  origin: "北京南站"
+  destination: "北京市朝阳区阜通东大街 19 号"
+  mode: "地铁 14 号线 + 步行"
+  estimated_minutes: 67
+  fare_cny: 6
+  notes: "晚间到站应核查 14 号线末班及酒店到店保留时间。"
+  updated_at: "2026-11-17T18:00:00+08:00"
