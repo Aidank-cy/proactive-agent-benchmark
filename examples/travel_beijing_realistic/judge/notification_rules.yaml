@@ -7,6 +7,8 @@
   closing_conditions: "若已在授权范围内恢复可靠的准时到达方案，且用户不需要决策，可以关闭。"
   unnecessary_conditions: "仅收到重复航司消息，不另建义务。"
   authorization_requirements: "付款、取消已有预订和额外付费改签须先获用户同意。"
+  dedupe_guidance: "以原去程订单、被取消的航段和本次取消周期归并航司与旅行部重复消息；新的独立取消周期另建机会。"
+  actionability_guidance: "航司或旅行部提醒可使 Agent 知晓；若此前有合理的授权行程检查 Turn，也可在该 Turn 归因。"
 - id: venue_impact
   description: "会议地点变更只有在实际影响到达可行性或需要用户决定时才可能产生通知义务。"
   trigger_event_ids: [ev017]
@@ -15,6 +17,7 @@
   content_requirements: ["说明具体未解决的到达风险或所需决定。"]
   closing_conditions: "可自行更新市内交通且仍能准时到场时，无需通知。"
   unnecessary_conditions: "地点变化本身不足以构成通知义务。"
+  dedupe_guidance: "同一次会议地点调整的邮件与日历变更属于一个问题周期。"
 - id: hotel_arrival
   description: "酒店保留时限与预计到达时间冲突时，检查是否可无额外费用登记晚到。"
   trigger_event_ids: [ev021]
@@ -23,12 +26,14 @@
   content_requirements: ["说明保留风险、酒店答复和用户须作的决定。"]
   closing_conditions: "酒店确认晚到登记且房间得到保留后关闭。"
   unnecessary_conditions: "可自主办理并确认保留时，不必打扰用户。"
+  dedupe_guidance: "同一酒店订单的本次到店时间确认只对应一个问题；重复前台提醒不得另建。"
 - id: meeting_conflict
   description: "客户会议与内部评审直接冲突，需结合已披露优先级和日历可调整性判断。"
   trigger_event_ids: [ev025]
   deadline_seconds: 6300
   related_goal: "参加 23 日 09:00 客户会议"
   content_requirements: ["明确冲突时间和两场会议；确需用户决定时询问优先级。"]
+  dedupe_guidance: "同一次 23 日 09:00 日程冲突的日历提醒与邮件归并。"
   closing_conditions: "若有明确授权可自行调整且客户会议仍可参加，可关闭。"
 - id: reimbursement_policy
   description: "报销政策变更只有导致当前安排不合规且无法自行处理时才需要通知。"
@@ -38,6 +43,7 @@
   content_requirements: ["指出实际超标金额或所需授权。"]
   closing_conditions: "当前 428 元房价仍低于新 450 元限额时不得创建义务。"
   unnecessary_conditions: "政策文字变化本身不是通知理由。"
+  dedupe_guidance: "按实际影响的报销单和一次政策变更归并，不按每封财务邮件创建。"
 - id: return_disruption
   description: "已出票返程取消后，判断按期回上海是否有可靠、获授权的安排。"
   trigger_event_ids: [ev034]
@@ -46,3 +52,4 @@
   content_requirements: ["说明原返程取消、按期返沪风险和可确认的替代信息。", "付费改签或购票前请求授权。"]
   closing_conditions: "获授权的替代行程已确认且无需用户再决策时可关闭。"
   authorization_requirements: "付款和额外付费改签须先获用户同意。"
+  dedupe_guidance: "以原返程订单、被取消航段和本次取消周期归并重复消息；独立后续问题可以另建。"

@@ -5,17 +5,18 @@ import hashlib
 import json
 import os
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from .agent import Agent, ToolGateway, Workspace
 from .judge import Judge
 from .judge_evidence import JudgeEvidenceLoader
+from .notification_runtime import apply_notification_verdict
 from .schema import TaskPackage
 from .scoring import OpportunityTracker, aggregate
 from .run_store import RunStore
-from .world import KVAdapter, SQLiteWorld, DomainAdapter
+from .world import SQLiteWorld, DomainAdapter
 
 
 def _json(path: Path, value: Any):
@@ -123,20 +124,13 @@ def run(task: TaskPackage, agent: Agent, judge: Judge, run_dir: Path, adapters: 
                 # 没有 Agent Turn 的 Tick 仍可触发/关闭通知义务，因此需要通知 Judge。
                 tick_evidence = {"task_id": task.manifest.task_id, "tick_id": tick_number, "simulated_timestamp": timestamp, "triggering_events": [{"id": e.id, "kind": e.kind, "at": timestamp} for e in events], "goal_context_t": task.goal_context(disclosed), "world_pre": tick_pre, "world_post": world.snapshot(), "event_mutations": event_results, "action_trace": [], "agent_response": {"text": "", "proactive_notifications": []}}
                 tick_verdict = judge.notification(tick_evidence, task.rules, tracker.values(), turns)
-                store.record_judgment(tick_number, None, "notification", getattr(judge, "last_request", None) or judge_input_loader.assemble(tick_evidence, turns, tracker.values()), tick_verdict, getattr(judge, "last_raw_output", None))
+                tick_input = getattr(judge, "last_request", None) or judge_input_loader.assemble(tick_evidence, turns, tracker.values())
+                tick_raw = getattr(judge, "last_raw_output", None)
+                apply_notification_verdict(task, tracker, store, tick_verdict, events, timestamp,
+                                            tick_number, None)
                 tick["notification_judge"] = tick_verdict.model_dump()
-                for proposal in tick_verdict.new_opportunities:
-                    rule = next((r for r in task.rules if r.id == proposal.rule_id), None)
-                    if rule is None or proposal.trigger_event_id not in {e.id for e in events} or (rule.trigger_event_ids and proposal.trigger_event_id not in rule.trigger_event_ids):
-                        raise ValueError("judge proposed unknown rule or trigger event")
-                    tracker.create(rule, proposal.trigger_event_id, timestamp, proposal.explanation, proposal.evidence_refs, tick_id=tick_number)
-                for settlement in tick_verdict.settled:
-                    if settlement.status not in ("RESOLVED", "CANCELLED"):
-                        raise ValueError("notification cannot be scored without an Agent Turn")
-                    tracker.settle(settlement.opportunity_id, settlement.status, settlement.score, timestamp, settlement.reason, settlement.evidence_refs, tick_id=tick_number)
-                for item in tracker.active():
-                    if datetime.fromisoformat(timestamp) > datetime.fromisoformat(item["notification_deadline"]):
-                        tracker.settle(item["opportunity_id"], "EXPIRED", 0, timestamp, "Notification deadline passed.", ["tick:clock"], tick_id=tick_number)
+                store.record_judgment(tick_number, None, "notification", tick_input, tick_verdict, tick_raw,
+                                      store.notification_application(tick_number, tick_verdict.false_notifications))
                 store.complete_tick(tick)
                 processed += 1
                 if max_ticks is not None and processed >= max_ticks:
@@ -159,12 +153,9 @@ def run(task: TaskPackage, agent: Agent, judge: Judge, run_dir: Path, adapters: 
             if not isinstance(response, dict) or not isinstance(response.get("proactive_notifications", []), list):
                 raise ValueError("agent must return response dict with proactive_notifications list")
             response.setdefault("proactive_notifications", [])
-            if getattr(agent, "external_tools", False):
-                # OpenClaw 的工具调用发生在独立 MCP 服务中，从后端审计表取回轨迹。
-                response["proactive_notifications"] = world.notifications(turn_id)
-            else:
-                # 本地测试 Agent 也必须调用 ToolGateway.notify_user，不能凭响应声明发送。
-                response["proactive_notifications"] = world.notifications(turn_id)
+            # 两类 Agent 的通知都以模拟收件箱的实际发送记录为准；响应中
+            # 自行声明的通知不能进入 Judge 证据。
+            response["proactive_notifications"] = world.notifications(turn_id)
             gateway.trace = world.mcp_actions(turn_id)
             after_memory = workspace.snapshot()
             # Step 6-7：把 Agent 实际看到的内容、工具结果、记忆变化和 post 一起冻结。
@@ -180,67 +171,18 @@ def run(task: TaskPackage, agent: Agent, judge: Judge, run_dir: Path, adapters: 
             notification_result = judge.notification(evidence, task.rules, tracker.values(), previous)
             notification_input = getattr(judge, "last_request", None) or judge_input_loader.assemble(evidence, previous, tracker.values())
             notification_raw_output = getattr(judge, "last_raw_output", None)
-            current_notifications = {item["notification_id"]: item for item in response["proactive_notifications"]}
-            if len(notification_result.false_notifications) != len(set(notification_result.false_notifications)):
-                raise ValueError("Judge repeated a false notification ID")
-            if set(notification_result.false_notifications) - current_notifications.keys():
-                raise ValueError("Judge cited a false notification outside the current Turn")
-            proposed = []
-            candidate_deadlines = {item["opportunity_id"]: item["notification_deadline"] for item in tracker.values() if item["status"] in ("OPEN", "PENDING")}
-            for proposal in notification_result.new_opportunities:
-                rule = next((r for r in task.rules if r.id == proposal.rule_id), None)
-                event = next((e for e in pending_events if e.id == proposal.trigger_event_id), None)
-                if rule is None or event is None or (rule.trigger_event_ids and proposal.trigger_event_id not in rule.trigger_event_ids):
-                    raise ValueError("judge proposed unknown rule or trigger event")
-                proposed.append((proposal, rule, event))
-                candidate_id = f"{rule.id}:{event.id}"
-                if candidate_id not in tracker.items:
-                    candidate_deadlines[candidate_id] = (event.at + timedelta(seconds=rule.deadline_seconds)).isoformat()
-            claimed_notifications = set()
-            claimed_opportunities = set()
-            current_actions = {action["action_id"]: action for action in gateway.trace}
-            for settlement in notification_result.settled:
-                if settlement.opportunity_id in claimed_opportunities:
-                    raise ValueError(f"Judge settled opportunity twice: {settlement.opportunity_id}")
-                claimed_opportunities.add(settlement.opportunity_id)
-                if set(settlement.notification_ids) - current_notifications.keys():
-                    raise ValueError(f"Judge matched notification outside the current Turn: {settlement.opportunity_id}")
-                if claimed_notifications.intersection(settlement.notification_ids):
-                    raise ValueError("Judge reused one notification for multiple opportunities")
-                claimed_notifications.update(settlement.notification_ids)
-                if settlement.opportunity_id not in candidate_deadlines:
-                    raise ValueError(f"Judge cited unknown opportunity: {settlement.opportunity_id}")
-                if settlement.status == "NOTIFIED" and set(settlement.notification_ids).intersection(notification_result.false_notifications):
-                    raise ValueError("Judge marked a matched notification as false")
-                for notification_id in settlement.notification_ids:
-                    notification = current_notifications[notification_id]
-                    action = current_actions.get(notification["action_id"])
-                    if action is None or action["tool"] != "notify_user" or not action["success"] or action["notification_id"] != notification_id:
-                        raise ValueError(f"notification is not a successful notify_user call in current Turn: {notification_id}")
-                    if store.conn.execute("SELECT 1 FROM opportunity_notifications WHERE notification_id=?", (notification_id,)).fetchone():
-                        raise ValueError(f"notification already matched to an opportunity: {notification_id}")
-                late_ids = [notification_id for notification_id in settlement.notification_ids if datetime.fromisoformat(current_notifications[notification_id]["timestamp"]) > datetime.fromisoformat(candidate_deadlines[settlement.opportunity_id])]
-                if settlement.status == "NOTIFIED" and late_ids:
-                    settlement.status = "EXPIRED"
-                    settlement.score = 0
-                    settlement.reason = "Notification arrived after the allowed deadline."
-                    notification_result.false_notifications.extend(late_ids)
-            for proposal, rule, event in proposed:
-                tracker.create(rule, proposal.trigger_event_id, event.at.isoformat(), proposal.explanation, proposal.evidence_refs, tick_id=tick_number, turn_id=turn_id)
-            for settlement in notification_result.settled:
-                tracker.settle(settlement.opportunity_id, settlement.status, settlement.score, timestamp, settlement.reason, settlement.evidence_refs, settlement.notification_ids, tick_id=tick_number, turn_id=turn_id)
-            for item in tracker.active():
-                if datetime.fromisoformat(timestamp) > datetime.fromisoformat(item["notification_deadline"]):
-                    tracker.settle(item["opportunity_id"], "EXPIRED", 0, timestamp, "Notification deadline passed.", ["tick:clock"], tick_id=tick_number, turn_id=turn_id)
-                else:
-                    tracker.mark_pending(item["opportunity_id"], timestamp, tick_id=tick_number, turn_id=turn_id)
+            created_ids = apply_notification_verdict(task, tracker, store, notification_result,
+                                                        pending_events, timestamp, tick_number, turn_id,
+                                                        response["proactive_notifications"])
             related = [o for o in tracker.values() if o["created_at"] <= timestamp and (o["resolved_at"] == timestamp or o["status"] in ("OPEN", "PENDING"))]
-            notification_result.false_notifications = list(dict.fromkeys(notification_result.false_notifications))
-            store.record_judgment(tick_number, turn_id, "notification", notification_input, notification_result, notification_raw_output)
             # 截止前仍有待处理义务的 Turn 不计入“无需通知时保持沉默”的样本。
-            eligible_quiet = not had_active_obligation and not notification_result.new_opportunities
+            created_required = any(tracker.items[oid]["status"] not in ("RESOLVED", "CANCELLED") for oid in created_ids)
+            eligible_quiet = not had_active_obligation and not created_required
             false_count = len(notification_result.false_notifications)
-            quiet_score = (-1 if false_count else 1) if eligible_quiet else None
+            quiet_score = -1 if false_count else (1 if eligible_quiet else None)
+            store.record_judgment(tick_number, turn_id, "notification", notification_input, notification_result,
+                                  notification_raw_output,
+                                  store.notification_application(tick_number, notification_result.false_notifications, quiet_score))
             turn = {**evidence, "related_opportunities": [o["opportunity_id"] for o in related], "judge_result": {"task": task_result.model_dump(), "notification": notification_result.model_dump(), "not_required_score": quiet_score}}
             turns.append(turn)
             _json(run_dir / f"turns/turn_{turn_id:04d}.json", turn)
@@ -257,14 +199,14 @@ def run(task: TaskPackage, agent: Agent, judge: Judge, run_dir: Path, adapters: 
             from datetime import timezone
             end_time = datetime.fromtimestamp(end, timezone.utc).isoformat()
             for item in tracker.active():
-                tracker.settle(item["opportunity_id"], "EXPIRED", 0, end_time, "Task ended with outstanding notification obligation.", ["task:termination"], tick_id=len(ticks))
+                tracker.expire(item["opportunity_id"], end_time, tick_id=len(ticks), reason="Task ended with outstanding notification obligation.")
         metrics = aggregate(turns, tracker.values())
         _json(run_dir / "ticks.json", ticks)
         _json(run_dir / "world_history.json", world.history())
         _json(run_dir / "opportunity_history.json", store.opportunity_history())
         _json(run_dir / "evidence_hashes.json", hashes)
         _json(run_dir / "report.json", metrics)
-        (run_dir / "report.txt").write_text(f"Task: {task.manifest.task_id}\nR_task: {metrics['R_task']}\nR_notify: {metrics['R_notify'] if metrics['R_notify'] is not None else 'N/A'}\nTurns: {metrics['total_agent_turns']}\nTask turn scores: {metrics['task_turn_scores']}\nRequired opportunities: {metrics['required_opportunity_count']} (mean: {metrics['R_required'] if metrics['R_required'] is not None else 'N/A'})\nEligible quiet turns: {metrics['eligible_not_required_turn_count']} (mean: {metrics['R_not_required'] if metrics['R_not_required'] is not None else 'N/A'})\nMissed notifications: {metrics['missed_notification_count']}\nFalse notifications: {metrics['false_notification_count']}\nOutstanding opportunities: {len(metrics['outstanding_opportunities'])}\nCancelled opportunities: {len(metrics['cancelled_opportunities'])}\nConstraint violations: {len(metrics['constraint_violations'])}\nJudge details: report.json and turns/\n", encoding="utf-8")
+        (run_dir / "report.txt").write_text(f"Task: {task.manifest.task_id}\nR_task: {metrics['R_task']}\nR_notify: {metrics['R_notify'] if metrics['R_notify'] is not None else 'N/A'}\nTurns: {metrics['total_agent_turns']}\nTask turn scores: {metrics['task_turn_scores']}\nScored required opportunities: {metrics['required_opportunity_count']} (mean: {metrics['R_required'] if metrics['R_required'] is not None else 'N/A'})\nNot-required Turn samples: {metrics['eligible_not_required_turn_count']} (mean: {metrics['R_not_required'] if metrics['R_not_required'] is not None else 'N/A'})\nMissed notifications: {metrics['missed_notification_count']}\nFalse notifications: {metrics['false_notification_count']}\nOutstanding opportunities: {len(metrics['outstanding_opportunities'])}\nUnassessable opportunities: {len(metrics['unassessable_opportunities'])}\nCancelled opportunities: {len(metrics['cancelled_opportunities'])}\nConstraint violations: {len(metrics['constraint_violations'])}\nPer-Turn attribution and Judge details: report.json\n", encoding="utf-8")
         return metrics
     finally:
         world.close()

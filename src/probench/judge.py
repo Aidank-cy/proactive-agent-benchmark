@@ -35,15 +35,50 @@ class OpportunityProposal(BaseModel):
     model_config = ConfigDict(extra="forbid")
     rule_id: str
     trigger_event_id: str
+    # Stable within one problem episode. A later independent disruption uses a new key.
+    dedupe_key: str | None = Field(default=None, min_length=1)
+    actionable_now: bool = False
     explanation: str = Field(min_length=1)
     evidence_refs: list[str] = Field(min_length=1)
+
+
+class ActionabilityAssessment(BaseModel):
+    """Judge identifies the first Turn where the Agent could reasonably act."""
+
+    model_config = ConfigDict(extra="forbid")
+    opportunity_id: str
+    explanation: str = Field(min_length=1)
+    evidence_refs: list[str] = Field(min_length=1)
+
+
+class NotificationAssessment(BaseModel):
+    """A current Turn's real notifications assessed for one Opportunity."""
+
+    model_config = ConfigDict(extra="forbid")
+    opportunity_id: str | None = None
+    rule_id: str | None = None
+    dedupe_key: str | None = None
+    notification_ids: list[str] = Field(min_length=1)
+    quality: Literal["partial", "complete", "harmful"]
+    explanation: str = Field(min_length=1)
+    evidence_refs: list[str] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def unique_ids(self):
+        if len(self.notification_ids) != len(set(self.notification_ids)):
+            raise ValueError("duplicate notification ID in assessment")
+        if bool(self.opportunity_id) == bool(self.rule_id and self.dedupe_key):
+            raise ValueError("assessment needs either opportunity_id or rule_id plus dedupe_key")
+        return self
 
 
 class Settlement(BaseModel):
     """一项现有通知义务的最终结果，关闭后不得重复计分。"""
 
     model_config = ConfigDict(extra="forbid")
-    opportunity_id: str
+    opportunity_id: str | None = None
+    rule_id: str | None = None
+    dedupe_key: str | None = None
     status: Literal["NOTIFIED", "RESOLVED", "EXPIRED", "CANCELLED"]
     score: Literal[-1.0, 0.0, 0.5, 1.0] | None = None
     notification_ids: list[str] = Field(default_factory=list)
@@ -52,6 +87,8 @@ class Settlement(BaseModel):
 
     @model_validator(mode="after")
     def check_score(self):
+        if bool(self.opportunity_id) == bool(self.rule_id and self.dedupe_key):
+            raise ValueError("settlement needs either opportunity_id or rule_id plus dedupe_key")
         if (self.status in ("NOTIFIED", "EXPIRED")) != (self.score is not None):
             raise ValueError("settlement score/status mismatch")
         if self.status == "NOTIFIED" and not self.notification_ids:
@@ -66,6 +103,8 @@ class Settlement(BaseModel):
 class NotificationVerdict(BaseModel):
     model_config = ConfigDict(extra="forbid")
     new_opportunities: list[OpportunityProposal] = Field(default_factory=list)
+    actionable: list[ActionabilityAssessment] = Field(default_factory=list)
+    assessments: list[NotificationAssessment] = Field(default_factory=list)
     settled: list[Settlement] = Field(default_factory=list)
     false_notifications: list[str] = Field(default_factory=list)
     explanation: str = Field(min_length=1)
@@ -119,9 +158,12 @@ class OpenAICompatibleJudge:
         allowed.update(f"history:{item['seq']}" for item in relevant.get("world_history", []))
         allowed.update(f"previous_turn:{item['turn_id']}" for item in relevant.get("previous_turns", payload.get("previous_evidence", [])))
         allowed.update(f"previous_notification:{item['turn_id']}" for item in relevant.get("previous_notifications", []))
+        allowed.update(f"notification:{item['notification_id']}" for item in payload.get("current_notifications", []))
+        for opportunity in relevant.get("opportunities", payload.get("opportunities", [])):
+            allowed.update(f"notification:{notification_id}" for notification_id in opportunity.get("notification_ids", []))
         groups = [verdict.evidence_refs]
         if isinstance(verdict, NotificationVerdict):
-            groups.extend(item.evidence_refs for item in [*verdict.new_opportunities, *verdict.settled])
+            groups.extend(item.evidence_refs for item in [*verdict.new_opportunities, *verdict.actionable, *verdict.assessments, *verdict.settled])
         for refs in groups:
             for ref in refs:
                 if ref not in allowed:
@@ -131,6 +173,8 @@ class OpenAICompatibleJudge:
                 # 候选事件 ID 只是线索，不能单独证明通知必要性。
                 if not any(not ref.startswith("event:") for ref in proposal.evidence_refs):
                     raise ValueError("notification opportunity needs condition evidence beyond an event ID")
+                if not proposal.dedupe_key:
+                    raise ValueError("LLM notification proposal requires a stable dedupe_key")
 
     def _ask(self, kind: str, payload: dict[str, Any], model):
         """请求独立 Judge API，并按指定判词模型校验 JSON 和证据引用。
@@ -185,7 +229,8 @@ class MockJudge:
 
     def notification(self, evidence, rules, opportunities, previous):
         ids = {e["id"] for e in evidence["triggering_events"]}
-        proposals = [OpportunityProposal(rule_id=r.id, trigger_event_id=eid, explanation="Configured synthetic trigger occurred.", evidence_refs=[f"event:{eid}", "world:post", "goal:context"]) for r in rules for eid in r.trigger_event_ids if eid in ids]
+        proposals = [OpportunityProposal(rule_id=r.id, trigger_event_id=eid, actionable_now=evidence.get("turn_id") is not None, explanation="Configured synthetic trigger occurred.", evidence_refs=[f"event:{eid}", "world:post", "goal:context"]) for r in rules for eid in r.trigger_event_ids if eid in ids]
+        actionable = [ActionabilityAssessment(opportunity_id=o["opportunity_id"], explanation="Synthetic fixture exposes the signal to the current Turn.", evidence_refs=["world:post"]) for o in opportunities if o["status"] in ("OPEN", "PENDING") and o.get("origin_turn_id") is None and evidence.get("turn_id") is not None]
         notifications = evidence["agent_response"]["proactive_notifications"]
         open_ids = [o["opportunity_id"] for o in opportunities if o["status"] in ("OPEN", "PENDING")]
         open_ids.extend(f"{item.rule_id}:{item.trigger_event_id}" for item in proposals if f"{item.rule_id}:{item.trigger_event_id}" not in open_ids)
@@ -201,5 +246,5 @@ class MockJudge:
                 settled.append({"opportunity_id": oid, "status": "NOTIFIED", "score": 1.0, "notification_ids": [notification["notification_id"]], "reason": "Synthetic notification matched open opportunity.", "evidence_refs": ["turn:notification"]})
             else:
                 false.append(notification["notification_id"])
-        return NotificationVerdict(new_opportunities=proposals, settled=settled, false_notifications=false, explanation="Deterministic fixture notification check.", evidence_refs=["turn:response"])
+        return NotificationVerdict(new_opportunities=proposals, actionable=actionable, settled=settled, false_notifications=false, explanation="Deterministic fixture notification check.", evidence_refs=["turn:response"])
 

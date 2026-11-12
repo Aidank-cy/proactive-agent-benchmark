@@ -109,6 +109,8 @@ class NotificationRule(BaseModel):
     closing_conditions: str | None = None
     unnecessary_conditions: str | None = None
     authorization_requirements: str | None = None
+    dedupe_guidance: str | None = None
+    actionability_guidance: str | None = None
 
 
 class TaskPackage(BaseModel):

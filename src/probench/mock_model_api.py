@@ -91,6 +91,8 @@ class Handler(BaseHTTPRequestHandler):
                 verdict = judge.task(evidence, [NotificationRule.model_validate(x) for x in request["hidden_rules"]], previous, opportunities)
             else:
                 verdict = judge.notification(evidence, [NotificationRule.model_validate(x) for x in request["hidden_rules"]], opportunities, previous)
+                for item in verdict.new_opportunities:
+                    item.dedupe_key = f"offline-fixture:{item.rule_id}:{item.trigger_event_id}"
             message, finish = {"role": "assistant", "content": verdict.model_dump_json()}, "stop"
         else:
             message, finish = _agent_reply(body)

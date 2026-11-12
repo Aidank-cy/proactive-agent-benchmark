@@ -32,7 +32,7 @@ def test_text_only_notification_settles_without_hidden_id(tmp_path):
     assert action_args == {"text": "The signal changed."}
     assert legacy_id is None
     assert result["opportunities"][0]["notification_ids"] == [notification_id]
-    assert result["turn_judgments"][2]["notification"]["settled"][0]["notification_ids"] == [notification_id]
+    assert result["turn_judgments"][2]["notification"]["assessments"][0]["notification_ids"] == [notification_id]
     assert db.execute("SELECT notification_ids FROM opportunity_history WHERE to_status='NOTIFIED'").fetchone()[0] == json.dumps([notification_id], ensure_ascii=False)
     db.close()
 
@@ -124,8 +124,9 @@ def test_schema_and_runtime_reject_invalid_matching(tmp_path):
                 base.settled = [Settlement(opportunity_id=row["opportunity_id"], status="NOTIFIED", score=1, notification_ids=[notification_id], reason="Claimed twice.", evidence_refs=["turn:notification"]) for row in opportunities]
             return base
 
-    with pytest.raises(ValueError, match="reused one notification"):
-        run(second_task, MockAgent(second_script), DoubleMatchJudge(), tmp_path / "double")
+    shared = run(second_task, MockAgent(second_script), DoubleMatchJudge(), tmp_path / "double")
+    assert shared["required_opportunity_count"] == 2
+    assert len({row["notification_ids"][0] for row in shared["opportunities"]}) == 1
 
 
 def test_tracker_rejects_duplicate_use_wrong_turn_and_failed_action(tmp_path):
@@ -141,15 +142,15 @@ def test_tracker_rejects_duplicate_use_wrong_turn_and_failed_action(tmp_path):
     with pytest.raises(ValueError, match="current Turn"):
         tracker.settle(a["opportunity_id"], "NOTIFIED", 1, at, "x", [], [nid], tick_id=2, turn_id=2)
     tracker.settle(a["opportunity_id"], "NOTIFIED", 1, at, "x", [], [nid], tick_id=1, turn_id=1)
-    with pytest.raises(ValueError, match="already matched"):
-        tracker.settle(b["opportunity_id"], "NOTIFIED", 1, at, "x", [], [nid], tick_id=1, turn_id=1)
-    assert tracker.items[b["opportunity_id"]]["status"] == "OPEN"
+    tracker.settle(b["opportunity_id"], "NOTIFIED", 1, at, "x", [], [nid], tick_id=1, turn_id=1)
+    assert tracker.items[b["opportunity_id"]]["status"] == "NOTIFIED"
     with pytest.raises(ValueError, match="already settled"):
         tracker.settle(a["opportunity_id"], "NOTIFIED", 1, at, "x", [], [nid], tick_id=1, turn_id=1)
     bad = world.notify(1, at, "failed", action_id="action:2")
     world.record_mcp_action(1, at, "notify_user", {"text": "failed"}, None, False, "failed", {}, action_id="action:2", notification_id=bad)
+    c = tracker.create(rule, "event_c", "2026-01-01T00:00:00+00:00")
     with pytest.raises(ValueError, match="successful notify_user"):
-        tracker.settle(b["opportunity_id"], "NOTIFIED", 1, at, "x", [], [bad], tick_id=1, turn_id=1)
+        tracker.settle(c["opportunity_id"], "NOTIFIED", 1, at, "x", [], [bad], tick_id=1, turn_id=1)
     world.close()
 
 
@@ -157,7 +158,7 @@ def test_deadline_uses_actual_notification_timestamp_and_scores_unchanged(tmp_pa
     task, script = fixture()
     task.rules[0].deadline_seconds = 30
     result = run(task, MockAgent(script), MockJudge(), tmp_path / "late")
-    late_id = result["opportunities"][0]["notification_ids"][0]
+    late_id = json.loads((tmp_path / "late/turns/turn_0003.json").read_text())["agent_response"]["proactive_notifications"][0]["notification_id"]
     assert result["opportunities"][0]["status"] == "EXPIRED"
     assert result["opportunities"][0]["final_score"] == 0
     assert result["turn_judgments"][2]["notification"]["false_notifications"] == [late_id]

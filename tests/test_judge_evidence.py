@@ -57,7 +57,7 @@ def test_global_task_prompt_and_bounded_actual_evidence(monkeypatch, tmp_path):
     system = request["messages"][0]["content"]
     body = json.loads(request["messages"][1]["content"])
     assert "harmful_violation (-1)" in system
-    assert "identify candidate events only" in system
+    assert "identify candidates only" in system
     assert "Synthetic fixture Judge guidance" in body["task_instructions"]
     assert body["goal_context"] == current["goal_context_t"]
     assert body["relevant_history"]["previous_turns"][0]["turn_id"] == 1

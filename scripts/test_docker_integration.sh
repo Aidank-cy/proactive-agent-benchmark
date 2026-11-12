@@ -35,6 +35,8 @@ turns = [[json.loads(path.read_text()) for path in sorted((root / 'turns').glob(
 for report, run_turns in zip(reports, turns):
     assert report['R_task'] is not None and report['R_notify'] is not None
     assert len(run_turns) == 15
+    assert len(report['per_turn_notification_attribution']) == 15
+    assert all('origin_tick_id' in item and 'settled_tick_id' in item for item in report['opportunities'])
     assert any(action['tool'] == 'flight.list' and action['success'] for turn in run_turns for action in turn['action_trace'])
     assert len({turn['agent_session_reference'] for turn in run_turns}) == 1
     assert all('ground_truth' not in json.dumps(turn['agent_observation']) for turn in run_turns)

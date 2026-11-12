@@ -75,7 +75,7 @@ class JudgeEvidenceLoader:
     def assemble(self, evidence: dict[str, Any], previous: list[dict[str, Any]], opportunities: list[dict[str, Any]]) -> dict[str, Any]:
         """组装当前 Tick 的统一 Judge 输入；历史记录只取已披露且有界的部分。"""
         cache_key = (evidence.get("tick_id"), evidence.get("turn_id"), tuple(item["turn_id"] for item in previous),
-                     tuple((item["opportunity_id"], item["status"], item.get("final_score")) for item in opportunities))
+                     tuple((item["opportunity_id"], item["status"], item.get("final_score"), len(item.get("notification_attempts", []))) for item in opportunities))
         if cache_key == self._cache_key:
             return copy.deepcopy(self._cache_value)
         selected = set(self.sources.sources)
@@ -106,7 +106,25 @@ class JudgeEvidenceLoader:
         if "world_history" in selected:
             # 即使提供了更长的后端历史，也只发送当前模拟时刻之前的末尾记录。
             relevant["world_history"] = history[-self.sources.world_history_limit:] if self.sources.world_history_limit else []
-        visible_opportunities = [row for row in opportunities if datetime.fromisoformat(row["created_at"]) <= now]
+        visible_opportunities = []
+        for opportunity in opportunities:
+            if datetime.fromisoformat(opportunity["created_at"]) > now:
+                continue
+            row = copy.deepcopy(opportunity)
+            row["notification_attempts"] = [attempt for attempt in row.get("notification_attempts", []) if datetime.fromisoformat(attempt["at"]) <= now]
+            if any(datetime.fromisoformat(notice["timestamp"]) > now for attempt in row["notification_attempts"] for notice in attempt.get("notifications", [])):
+                raise ValueError("Judge opportunity contains a future notification")
+            if row.get("first_actionable_at") and datetime.fromisoformat(row["first_actionable_at"]) > now:
+                row["origin_turn_id"] = None
+                row["first_actionable_at"] = None
+            if row.get("resolved_at") and datetime.fromisoformat(row["resolved_at"]) > now:
+                row.update(status="PENDING" if row.get("origin_turn_id") is not None else "OPEN",
+                           resolved_at=None, final_score=None, reason=None,
+                           settled_tick_id=None, settled_turn_id=None,
+                           notification_evidence=[], evaluation_status="valid")
+                row["notification_ids"] = [notification_id for attempt in row["notification_attempts"] for notification_id in attempt["notification_ids"]]
+                row["notification_id"] = row["notification_ids"][0] if row["notification_ids"] else None
+            visible_opportunities.append(row)
         relevant["opportunities"] = visible_opportunities
         events = self.store.events_for_ids(event_ids) if self.store else evidence.get("triggering_events", [])
         if any(datetime.fromisoformat(event["at"]) > now for event in events):
