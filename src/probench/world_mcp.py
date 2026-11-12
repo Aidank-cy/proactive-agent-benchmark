@@ -17,7 +17,10 @@ from .world import SQLiteWorld
 
 
 def _tool_function(name: str, description: str, input_model, callback):
-    """Give FastMCP an ordinary typed signature from a service's input schema."""
+    """把 Pydantic 参数模型转换成 FastMCP 能识别的动态函数签名。
+
+    这样新增服务只需声明 OperationSpec，不必在此手写新的 MCP 工具。
+    """
     parameters = []
     annotations = {}
     for field_name, field in input_model.model_fields.items():
@@ -37,6 +40,7 @@ def _tool_function(name: str, description: str, input_model, callback):
 
 
 def build_mcp(plan: dict, run_dir: Path, registry: ServiceRegistry = DEFAULT_REGISTRY) -> FastMCP:
+    """仅为公开计划中获准的操作注册工具，并连接本次运行的世界数据库。"""
     if registry is DEFAULT_REGISTRY:
         load_service_modules()
     server = FastMCP("benchmark-world", host="0.0.0.0", port=8000, stateless_http=True, json_response=True)
@@ -47,12 +51,14 @@ def build_mcp(plan: dict, run_dir: Path, registry: ServiceRegistry = DEFAULT_REG
     action_lock = Lock()
 
     def control():
+        # 每次调用都读取当前 Turn 的控制文件，防止沿用上个 Turn 的权限。
         data = json.loads((run_dir / "world_control.json").read_text(encoding="utf-8"))
         if data["permissions"] != permissions or data.get("task_id") != plan["task_id"] or data.get("plan_digest") != digest:
             raise PermissionError("active turn does not match prepared service plan")
         return data
 
     def execute(instance: str, operation: str, arguments: dict[str, Any]):
+        # 串行化 MCP 调用，确保动作顺序、前后快照与审计记录一致。
         with action_lock:
             turn = control()
             if operation not in permissions.get(instance, []):
@@ -61,19 +67,21 @@ def build_mcp(plan: dict, run_dir: Path, registry: ServiceRegistry = DEFAULT_REG
                 raise RuntimeError("world is not initialized")
             world = SQLiteWorld(run_dir / "world.db", {}, adapters)
             try:
-                before = world.snapshot()
+                action_id = world.next_action_id(turn["turn_id"])
                 try:
                     mutating = adapters[instance].is_mutating(operation)
-                    result, changes = world.execute(instance, operation, arguments, mutate=mutating, source="agent-mcp", timestamp=turn["timestamp"])
-                    world.record_mcp_action(turn["turn_id"], turn["timestamp"], f"{instance}.{operation}", arguments, result, True, None, changes, before, world.snapshot(), read_only=not mutating)
+                    result, changes = world.execute(instance, operation, arguments, mutate=mutating, source=f"action:{action_id}", timestamp=turn["timestamp"], tick_id=turn.get("tick_id"), turn_id=turn["turn_id"], action_id=action_id)
+                    world.record_mcp_action(turn["turn_id"], turn["timestamp"], f"{instance}.{operation}", arguments, result, True, None, changes, read_only=not mutating, action_id=action_id)
                     return result
                 except Exception as exc:
-                    world.record_mcp_action(turn["turn_id"], turn["timestamp"], f"{instance}.{operation}", arguments, None, False, str(exc), {}, before, world.snapshot(), read_only=not adapters[instance].is_mutating(operation))
+                    # 即使领域操作失败，也记录失败结果供 Judge 检查。
+                    world.record_mcp_action(turn["turn_id"], turn["timestamp"], f"{instance}.{operation}", arguments, None, False, str(exc), {}, read_only=not adapters[instance].is_mutating(operation), action_id=action_id)
                     raise
             finally:
                 world.close()
 
     names = set()
+    # 工具目录由任务选择和权限共同决定，不能暴露未授权服务操作。
     for instance, item in bindings.items():
         adapter = adapters[instance]
         for tool in item["tools"]:
@@ -89,15 +97,18 @@ def build_mcp(plan: dict, run_dir: Path, registry: ServiceRegistry = DEFAULT_REG
             server.add_tool(_tool_function(name, spec.description, spec.input_model, callback), name=name, description=spec.description)
 
     def notify_user(text: str, opportunity_id: str = ""):
-        """Send a proactive notification to the simulated user inbox only."""
+        """把主动通知写入模拟用户收件箱，不连接真实消息渠道。
+
+        同时记录通知时间与 MCP 动作，使 Judge 能区别主动通知和普通回复。
+        """
         with action_lock:
             turn = control()
             world = SQLiteWorld(run_dir / "world.db", {}, adapters)
             try:
-                before = world.snapshot()
-                world.notify(turn["turn_id"], turn["timestamp"], text, opportunity_id or None)
-                result = {"delivered_to": "simulated_user_inbox", "timestamp": turn["timestamp"]}
-                world.record_mcp_action(turn["turn_id"], turn["timestamp"], "notify_user", {"text": text, "opportunity_id": opportunity_id}, result, True, None, {}, before, world.snapshot())
+                action_id = world.next_action_id(turn["turn_id"])
+                notification_id = world.notify(turn["turn_id"], turn["timestamp"], text, opportunity_id or None, action_id=action_id)
+                result = {"delivered_to": "simulated_user_inbox", "timestamp": turn["timestamp"], "notification_id": notification_id}
+                world.record_mcp_action(turn["turn_id"], turn["timestamp"], "notify_user", {"text": text, "opportunity_id": opportunity_id}, result, True, None, {}, action_id=action_id, notification_id=notification_id)
                 return result
             finally:
                 world.close()

@@ -16,11 +16,13 @@ if urlparse(base).scheme not in ("http", "https"):
 
 class Handler(BaseHTTPRequestHandler):
     def _forward(self):
+        # 只转发模型列表与推理接口，OpenClaw 无法借此访问任意外部路径。
         if self.path not in ("/v1/chat/completions", "/v1/models") or self.command not in ("POST", "GET"):
             self.send_error(404)
             return
         target = base + self.path.removeprefix("/v1")
         content = self.rfile.read(int(self.headers.get("Content-Length", "0"))) if self.command == "POST" else None
+        # 真正的 Agent API 密钥留在代理容器，发给上游时才注入。
         try:
             response = httpx.request(self.command, target, content=content, headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json", "Accept": self.headers.get("Accept", "application/json")}, timeout=180)
         except httpx.HTTPError as exc:

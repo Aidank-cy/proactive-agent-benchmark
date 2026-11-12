@@ -19,6 +19,7 @@ def _text(message):
 
 
 def _agent_reply(body):
+    """按合成夹具返回固定工具调用，仅用于离线接口测试。"""
     messages = body.get("messages", [])
     users = [(i, _text(x)) for i, x in enumerate(messages) if x.get("role") == "user"]
     if not users:
@@ -44,6 +45,21 @@ def _agent_reply(body):
     return {"role": "assistant", "content": None, "tool_calls": [{"id": f"call-{uuid.uuid4().hex[:8]}", "type": "function", "function": {"name": name, "arguments": json.dumps(args)}}]}, "tool_calls"
 
 
+def _mock_judge_input(request):
+    """离线测试服务器将统一 Tick 证据转给旧 MockJudge 接口。"""
+    if "tick" not in request:
+        return request["evidence"], request.get("previous_evidence", []), request.get("opportunities", [])
+    tick = request["tick"]
+    evidence = {"task_id": tick["task_id"], "turn_id": tick.get("turn_id"), "tick_id": tick["tick_id"],
+                "simulated_timestamp": tick["simulated_timestamp"],
+                "triggering_events": [{"id": item.get("event_id", item.get("id")), "kind": item["kind"], "at": item["at"]} for item in request["events"]],
+                "goal_context_t": request["goal_context"], "world_pre": request["world_state"]["pre"],
+                "world_post": request["world_state"]["post"], "action_trace": request["actions"],
+                "agent_response": request["agent_response"]}
+    history = request.get("relevant_history", {})
+    return evidence, history.get("previous_turns", []), history.get("opportunities", [])
+
+
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         data = {"object": "list", "data": [{"id": "fixture-model", "object": "model"}, {"id": "fixture-judge", "object": "model"}]}
@@ -56,12 +72,14 @@ class Handler(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         print(f"MOCK_MODEL_REQUEST model={body.get('model')} stream={bool(body.get('stream'))}", flush=True)
         if body.get("model") == "fixture-judge":
+            # 通过显式请求类型区分两个 Judge 阶段，避免被 rubric 文本误导。
             request = json.loads(_text(body["messages"][-1]))
+            evidence, previous, opportunities = _mock_judge_input(request)
             judge = MockJudge()
             if "JUDGE_REQUEST_KIND: task execution" in _text(body["messages"][0]):
-                verdict = judge.task(request["evidence"], [NotificationRule.model_validate(x) for x in request["hidden_rules"]], request.get("previous_evidence", []), request.get("opportunities", []))
+                verdict = judge.task(evidence, [NotificationRule.model_validate(x) for x in request["hidden_rules"]], previous, opportunities)
             else:
-                verdict = judge.notification(request["evidence"], [NotificationRule.model_validate(x) for x in request["hidden_rules"]], request.get("opportunities", []), request.get("previous_evidence", []))
+                verdict = judge.notification(evidence, [NotificationRule.model_validate(x) for x in request["hidden_rules"]], opportunities, previous)
             message, finish = {"role": "assistant", "content": verdict.model_dump_json()}, "stop"
         else:
             message, finish = _agent_reply(body)

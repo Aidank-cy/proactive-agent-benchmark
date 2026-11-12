@@ -1,3 +1,4 @@
+"""独立 Judge 接口、结构化判词、全局 rubric 和 API 客户端。"""
 from __future__ import annotations
 
 import json
@@ -13,6 +14,8 @@ from .schema import NotificationRule
 
 
 class TaskVerdict(BaseModel):
+    """一个完整 Agent Turn 的任务评分；类别与数值必须一一对应。"""
+
     model_config = ConfigDict(extra="forbid")
     category: Literal["goal_progress", "useful_information", "no_progress", "harmful_violation"]
     score: Literal[-1.0, 0.0, 0.5, 1.0]
@@ -27,6 +30,8 @@ class TaskVerdict(BaseModel):
 
 
 class OpportunityProposal(BaseModel):
+    """Judge 确认通知条件成立后，向跨 Turn 跟踪器提出新义务。"""
+
     model_config = ConfigDict(extra="forbid")
     rule_id: str
     trigger_event_id: str
@@ -35,6 +40,8 @@ class OpportunityProposal(BaseModel):
 
 
 class Settlement(BaseModel):
+    """一项现有通知义务的最终结果，关闭后不得重复计分。"""
+
     model_config = ConfigDict(extra="forbid")
     opportunity_id: str
     status: Literal["NOTIFIED", "RESOLVED", "EXPIRED", "CANCELLED"]
@@ -67,6 +74,8 @@ RUBRIC = files("probench").joinpath("global_judge_rubric.md").read_text(encoding
 
 
 class OpenAICompatibleJudge:
+    """通过独立 API 请求任务和通知判定，并校验结构及证据引用。"""
+
     def __init__(self):
         self.base_url = os.environ.get("BENCH_JUDGE_BASE_URL", "https://api.openai.com/v1").rstrip("/")
         self.key = os.environ.get("BENCH_JUDGE_API_KEY")
@@ -75,12 +84,15 @@ class OpenAICompatibleJudge:
             raise ValueError("BENCH_JUDGE_API_KEY and BENCH_JUDGE_MODEL are required")
         self.instructions = ""
         self.loader: JudgeEvidenceLoader | None = None
+        self.last_request: dict[str, Any] | None = None
+        self.last_raw_output: str | None = None
 
     def configure(self, task, run_dir, history):
         self.instructions = task.judge_instructions
         self.loader = JudgeEvidenceLoader(run_dir, task.judge_evidence_sources, history)
 
     def _payload(self, evidence, rules, previous, opportunities):
+        # 加载器筛选权威证据；任务说明和隐藏规则只进入 Judge 请求。
         data = self.loader.assemble(evidence, previous, opportunities) if self.loader else {
             "evidence": evidence, "previous_evidence": previous, "opportunities": opportunities,
         }
@@ -90,14 +102,16 @@ class OpenAICompatibleJudge:
 
     @staticmethod
     def _check_refs(verdict, payload):
-        evidence = payload["evidence"]
+        """拒绝指向未提供证据的引用，防止判词凭空引用未来或不存在的动作。"""
+        evidence = payload.get("evidence", {})
         allowed = {"world:pre", "world:post", "goal:context", "turn:response", "turn:notification"}
-        allowed.update(f"event:{item['id']}" for item in evidence.get("triggering_events", []))
-        allowed.update(f"action:{item['seq']}" for item in evidence.get("action_trace", []))
-        allowed.update(f"opportunity:{item['opportunity_id']}" for item in payload.get("opportunities", []))
-        allowed.update(f"history:{item['seq']}" for item in payload.get("world_history", []))
-        allowed.update(f"previous_turn:{item['turn_id']}" for item in payload.get("previous_evidence", []))
-        allowed.update(f"previous_notification:{item['turn_id']}" for item in payload.get("previous_notifications", []))
+        allowed.update(f"event:{item.get('event_id', item.get('id'))}" for item in payload.get("events", evidence.get("triggering_events", [])))
+        allowed.update(f"action:{item['seq']}" for item in payload.get("actions", evidence.get("action_trace", [])))
+        relevant = payload.get("relevant_history", payload)
+        allowed.update(f"opportunity:{item['opportunity_id']}" for item in relevant.get("opportunities", payload.get("opportunities", [])))
+        allowed.update(f"history:{item['seq']}" for item in relevant.get("world_history", []))
+        allowed.update(f"previous_turn:{item['turn_id']}" for item in relevant.get("previous_turns", payload.get("previous_evidence", [])))
+        allowed.update(f"previous_notification:{item['turn_id']}" for item in relevant.get("previous_notifications", []))
         groups = [verdict.evidence_refs]
         if isinstance(verdict, NotificationVerdict):
             groups.extend(item.evidence_refs for item in [*verdict.new_opportunities, *verdict.settled])
@@ -107,18 +121,28 @@ class OpenAICompatibleJudge:
                     raise ValueError(f"Judge cited unavailable evidence: {ref}")
         if isinstance(verdict, NotificationVerdict):
             for proposal in verdict.new_opportunities:
+                # 候选事件 ID 只是线索，不能单独证明通知必要性。
                 if not any(not ref.startswith("event:") for ref in proposal.evidence_refs):
                     raise ValueError("notification opportunity needs condition evidence beyond an event ID")
 
     def _ask(self, kind: str, payload: dict[str, Any], model):
+        """请求独立 Judge API，并按指定判词模型校验 JSON 和证据引用。
+
+        `kind` 分开任务执行与通知判定；返回内容不能仅因是 JSON 就被
+        接受，还必须符合分数字段约束、引用已提供的证据。
+        """
         schema = model.model_json_schema()
+        # 全局规则放在 system；任务说明与环境内容作为不可信数据放在 user。
         prompt = RUBRIC + "\nJUDGE_REQUEST_KIND: " + kind + ". Return JSON matching this schema: " + json.dumps(schema)
-        response = httpx.post(self.base_url + "/chat/completions", headers={"Authorization": f"Bearer {self.key}"}, json={"model": self.model, "temperature": 0, "messages": [{"role": "system", "content": prompt}, {"role": "user", "content": json.dumps(payload, default=str)}], "response_format": {"type": "json_object"}}, timeout=90)
+        request_body = {"model": self.model, "temperature": 0, "messages": [{"role": "system", "content": prompt}, {"role": "user", "content": json.dumps(payload, default=str)}], "response_format": {"type": "json_object"}}
+        self.last_request = request_body
+        response = httpx.post(self.base_url + "/chat/completions", headers={"Authorization": f"Bearer {self.key}"}, json=request_body, timeout=90)
         response.raise_for_status()
         try:
             raw = response.json()["choices"][0]["message"]["content"]
             if not isinstance(raw, str):
                 raise TypeError("content is not text")
+            self.last_raw_output = raw
         except (KeyError, IndexError, TypeError, ValueError) as exc:
             raise ValueError(f"malformed {kind} judge API response") from exc
         try:
@@ -138,6 +162,7 @@ class OpenAICompatibleJudge:
 class MockJudge:
     """Deterministic infrastructure test double; not a quality measure for LLM scoring."""
     def task(self, evidence, rules, previous, opportunities):
+        # 固定映射仅验证管线与分数聚合，不能替代真实 LLM 的语义判断。
         actions = evidence["action_trace"]
         violations = [a for a in actions if not a["success"] and "unavailable" in (a["error"] or "")]
         if violations:
@@ -165,6 +190,6 @@ class MockJudge:
                 claimed.add(oid)
                 settled.append({"opportunity_id": oid, "status": "NOTIFIED", "score": 1.0, "reason": "Synthetic notification matched open opportunity.", "evidence_refs": ["turn:notification"]})
             else:
-                false.append(json.dumps(notification, sort_keys=True))
+                false.append(notification["notification_id"])
         return NotificationVerdict(new_opportunities=proposals, settled=settled, false_notifications=false, explanation="Deterministic fixture notification check.", evidence_refs=["turn:response"])
 

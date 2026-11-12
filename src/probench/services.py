@@ -17,6 +17,8 @@ class EmptyArgs(BaseModel):
 
 @dataclass(frozen=True)
 class OperationSpec:
+    """声明一个服务操作的输入模型、读写性质及是否可暴露给 Agent。"""
+
     name: str
     description: str
     input_model: type[BaseModel]
@@ -25,6 +27,12 @@ class OperationSpec:
 
 
 class DomainAdapter(Protocol):
+    """新领域服务需实现的契约；同一实现可绑定不同任务初态。
+
+    `execute` 返回 `(工具结果, 状态变化)`。变化供后端历史与 Judge 使用，
+    操作是否允许由任务权限和 OperationSpec 的 `mutating` 声明共同决定。
+    """
+
     name: str
     state_model: type[BaseModel]
     operations: dict[str, OperationSpec]
@@ -36,6 +44,8 @@ class DomainAdapter(Protocol):
 
 
 class ServiceBase:
+    """为服务提供统一的 Pydantic 状态与参数验证。"""
+
     name: str
     state_model: type[BaseModel]
     operations: dict[str, OperationSpec]
@@ -44,6 +54,7 @@ class ServiceBase:
         return self.operations[operation].mutating
 
     def validate_state(self, state: dict[str, Any]) -> dict[str, Any]:
+        # RootModel（如 KV）与普通 BaseModel 的导出形状不同。
         parsed = self.state_model.model_validate(state)
         normalized = parsed.model_dump()
         if isinstance(parsed, RootModel):
@@ -128,6 +139,8 @@ class CounterAdapter(ServiceBase):
 
 
 class ServiceRegistry:
+    """保存服务工厂；任务选择服务名，而非复制服务实现。"""
+
     def __init__(self):
         self._factories: dict[str, Callable[[dict[str, Any]], DomainAdapter]] = {}
 
@@ -137,6 +150,7 @@ class ServiceRegistry:
         self._factories[name] = factory
 
     def create(self, name: str, config: dict[str, Any] | None = None) -> DomainAdapter:
+        # 每个任务绑定都创建独立适配器实例，配置由任务清单提供。
         if name not in self._factories:
             raise ValueError(f"unknown service: {name}")
         return self._factories[name](config or {})

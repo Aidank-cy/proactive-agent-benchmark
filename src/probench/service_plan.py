@@ -9,6 +9,7 @@ from .schema import TaskPackage
 
 
 def public_plan(task: TaskPackage) -> dict:
+    """从完整任务包中仅提取服务绑定和 Agent 获准使用的工具。"""
     adapters = task.service_adapters()
     bindings = []
     for binding in task.manifest.bindings():
@@ -36,6 +37,7 @@ def load_plan(path: Path) -> dict:
 
 
 def plan_digest(plan: dict) -> str:
+    # 使用规范化 JSON，使控制文件与 MCP 服务算出的摘要一致。
     return hashlib.sha256(json.dumps(plan, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 

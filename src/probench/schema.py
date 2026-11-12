@@ -1,3 +1,4 @@
+"""任务包配置模型、文件边界检查及加载时的交叉验证。"""
 from __future__ import annotations
 
 from datetime import datetime
@@ -20,6 +21,8 @@ def aware(value: datetime) -> datetime:
 
 
 class ServiceBinding(BaseModel):
+    """把注册表中的服务实例绑定到本任务，并决定 MCP 工具名前缀。"""
+
     id: str
     service: str
     config: dict[str, Any] = Field(default_factory=dict)
@@ -37,6 +40,8 @@ class ServiceBinding(BaseModel):
 
 
 class Manifest(BaseModel):
+    """任务入口：引用数据文件、服务、Agent 权限和 Judge 专属文件。"""
+
     task_id: str
     metadata: dict[str, Any] = Field(default_factory=dict)
     initial_timestamp: datetime
@@ -56,12 +61,15 @@ class Manifest(BaseModel):
     _timestamp = field_validator("initial_timestamp")(aware)
 
     def bindings(self) -> list[ServiceBinding]:
+        # 兼容早期 `adapters: [kv]` 清单；新任务应使用 `services`。
         if self.services is not None:
             return self.services
         return [ServiceBinding(id=name, service=name, tool_prefix="world" if name == "kv" else name) for name in self.adapters]
 
 
 class Event(BaseModel):
+    """环境 Tick 中的一项事件；只有部分事件会唤醒 Agent。"""
+
     id: str
     at: datetime
     kind: Literal["world_mutation", "user_message", "notification", "scheduled_wakeup", "time_advance"]
@@ -90,6 +98,8 @@ class ContextDisclosure(BaseModel):
 
 
 class NotificationRule(BaseModel):
+    """只给 Judge 使用的候选通知规则，事件 ID 本身不等于通知义务。"""
+
     id: str
     description: str
     trigger_event_ids: list[str] = Field(default_factory=list)
@@ -102,6 +112,8 @@ class NotificationRule(BaseModel):
 
 
 class TaskPackage(BaseModel):
+    """已验证的任务数据；Judge 文件保存在这里，不写入公开工具计划。"""
+
     _registry: ServiceRegistry = PrivateAttr(default=DEFAULT_REGISTRY)
     root: Path
     manifest: Manifest
@@ -116,6 +128,7 @@ class TaskPackage(BaseModel):
         return {binding.id: self._registry.create(binding.service, binding.config) for binding in self.manifest.bindings()}
 
     def goal_context(self, disclosed_event_ids: set[str]) -> dict[str, Any]:
+        """按事件顺序汇总已披露的用户信息，排除未来 Turn 的内容。"""
         event_order = {event.id: index for index, event in enumerate(self.events)}
         rows = [c.model_dump() for c in sorted(self.context, key=lambda row: event_order[row.event_id]) if c.event_id in disclosed_event_ids]
         return {"disclosures": rows}
@@ -136,6 +149,7 @@ def _read_text(root: Path, relative: str) -> str:
 
 
 def _read_judge_yaml(root: Path, relative: str) -> Any:
+    # Judge 附加配置只能来自 judge/ 目录，不接受任意文件路径。
     path = (root / relative).resolve()
     if not path.is_relative_to((root / "judge").resolve()):
         raise ValueError(f"Judge file must be inside task judge directory: {relative}")
@@ -143,6 +157,7 @@ def _read_judge_yaml(root: Path, relative: str) -> Any:
 
 
 def load_task(path: str | Path, registry: ServiceRegistry = DEFAULT_REGISTRY) -> TaskPackage:
+    """加载并交叉验证任务清单、事件、上下文、服务操作和 Judge 配置。"""
     if registry is DEFAULT_REGISTRY:
         load_service_modules()
     root = Path(path).resolve()
@@ -154,6 +169,7 @@ def load_task(path: str | Path, registry: ServiceRegistry = DEFAULT_REGISTRY) ->
     instructions = _read_text(root, manifest.judge_instructions) if manifest.judge_instructions else ""
     evidence_sources = EvidenceSources.model_validate(_read_judge_yaml(root, manifest.evidence_sources)) if manifest.evidence_sources else EvidenceSources()
     ids = [e.id for e in events]
+    # 同一时间的多事件保留文件顺序；跨时间必须按模拟时间排列。
     if len(set(ids)) != len(ids) or events != sorted(events, key=lambda e: e.at):
         raise ValueError("event IDs must be unique and events sorted by timestamp")
     event_by_id = {e.id: e for e in events}
@@ -172,6 +188,7 @@ def load_task(path: str | Path, registry: ServiceRegistry = DEFAULT_REGISTRY) ->
         json.dumps(binding.config)
     if set(world) != set(adapters):
         raise ValueError("initial world state must match selected service bindings")
+    # 在启动运行前拒绝不符合服务状态模型的任务数据。
     world = {name: adapter.validate_state(world[name]) for name, adapter in adapters.items()}
     tool_names = []
     for binding in bindings:

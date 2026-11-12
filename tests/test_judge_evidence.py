@@ -59,11 +59,11 @@ def test_global_task_prompt_and_bounded_actual_evidence(monkeypatch, tmp_path):
     assert "harmful_violation (-1)" in system
     assert "identify candidate events only" in system
     assert "Synthetic fixture Judge guidance" in body["task_instructions"]
-    assert body["evidence"]["goal_context_t"] == current["goal_context_t"]
-    assert body["previous_evidence"][0]["turn_id"] == 1
-    assert "memory_before" not in body["previous_evidence"][0]
-    assert body["world_history"][-1]["seq"] != 999
-    assert len(body["world_history"]) == 1
+    assert body["goal_context"] == current["goal_context_t"]
+    assert body["relevant_history"]["previous_turns"][0]["turn_id"] == 1
+    assert "memory_before" not in body["relevant_history"]["previous_turns"][0]
+    assert body["relevant_history"]["world_history"][-1]["seq"] != 999
+    assert len(body["relevant_history"]["world_history"]) == 1
     assert "FUTURE SECRET" not in json.dumps(body)
     assert task.rules[0].id in json.dumps(body["hidden_rules"])
 
@@ -97,10 +97,10 @@ def test_optional_evidence_is_selected_and_goal_changes_follow_event_order(tmp_p
     loader = JudgeEvidenceLoader(folder, EvidenceSources(sources=required), lambda: [{"seq": 999, "at": "2026-01-01T00:00:00+00:00"}])
     current = json.loads((folder / "evidence/turn_0002.json").read_text())
     payload = loader.assemble(current, [{"turn_id": 1}], [])
-    assert "previous_evidence" not in payload
-    assert "previous_notifications" not in payload
-    assert "world_history" not in payload
-    assert payload["evidence"]["goal_context_t"] == current["goal_context_t"]
+    assert "previous_turns" not in payload["relevant_history"]
+    assert "previous_notifications" not in payload["relevant_history"]
+    assert "world_history" not in payload["relevant_history"]
+    assert payload["goal_context"] == current["goal_context_t"]
 
 
 def test_task_judge_files_are_confined_and_legacy_defaults(tmp_path):
@@ -186,7 +186,7 @@ def test_notification_candidate_is_not_automatically_required(monkeypatch, tmp_p
     body = json.loads(captured[0]["messages"][1]["content"])
     assert "notification" in system.lower()
     assert body["hidden_rules"][0]["trigger_event_ids"] == ["change"]
-    assert any(event["id"] == "change" for event in body["evidence"]["triggering_events"])
+    assert any(event.get("event_id", event.get("id")) == "change" for event in body["events"])
 
 
 def test_wrong_judge_response_type_fails_instead_of_defaulting(monkeypatch, tmp_path):

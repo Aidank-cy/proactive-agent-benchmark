@@ -17,11 +17,11 @@ if [[ "${BENCH_SKIP_BUILD:-0}" != "1" ]]; then
   docker compose build benchmark
 fi
 docker compose up -d --no-build openclaw world model-proxy mock-model
-docker compose run --rm benchmark pytest -q tests/test_services.py tests/test_judge_evidence.py
+docker compose run --rm benchmark pytest -q tests/test_services.py tests/test_judge_evidence.py tests/test_storage_resume.py
 docker compose run --rm benchmark bench run examples/synthetic --agent openclaw --judge openai --output "runs/${BENCH_RUN_NAME}"
 docker compose run --rm benchmark bench report "runs/${BENCH_RUN_NAME}"
 python3 - "runs/${BENCH_RUN_NAME}" <<'PY'
-import json, pathlib, sys
+import json, pathlib, sqlite3, sys
 root = pathlib.Path(sys.argv[1])
 report = json.loads((root / 'report.json').read_text())
 turns = [json.loads(p.read_text()) for p in sorted((root / 'turns').glob('*.json'))]
@@ -36,6 +36,12 @@ assert all('notification_rules' not in json.dumps(t['agent_observation']) for t 
 assert turns[1]['world_pre']['kv']['item'] == 1
 assert report['required_opportunity_count'] == 1
 assert json.loads((root / 'run_metadata.json').read_text())['judge_runtime'] == 'OpenAICompatibleJudge'
+with sqlite3.connect(root / 'world.db') as db:
+    notification_id, action_id = db.execute('SELECT notification_id,action_id FROM notifications').fetchone()
+    assert db.execute('SELECT notification_id FROM mcp_actions WHERE action_id=?', (action_id,)).fetchone()[0] == notification_id
+    assert db.execute('SELECT COUNT(*) FROM judgments').fetchone()[0] == 8
+    assert db.execute('SELECT COUNT(*) FROM judgments WHERE raw_output IS NOT NULL').fetchone()[0] == 8
+    assert db.execute('SELECT COUNT(*) FROM opportunity_history').fetchone()[0] >= 2
 print('Docker OpenClaw integration assertions passed')
 PY
 docker compose logs mock-model | grep 'MOCK_MODEL_REQUEST model=fixture-model'

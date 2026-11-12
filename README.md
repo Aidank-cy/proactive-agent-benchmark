@@ -11,7 +11,7 @@ flowchart LR
   SR[Shared service registry] --> PL
   SR --> W
   PL --> G[MCP selected tools]
-  C --> W[(SQLite world)]
+  C --> W[(SQLite world state and run journal)]
   C --> O[Agent observation]
   O --> A[OpenClaw Gateway]
   A --> MP[Model API proxy]
@@ -70,7 +70,24 @@ Current goal context, pre/post state, event references, actions, tool results, r
 
 ## Evidence and scoring
 
-Each `evidence/turn_NNNN.json` contains event IDs, timestamp, disclosed context, observation, pre/post state, ordered action trace and tool results, response, memory versions/delta, and related opportunities. OpenClaw session memory uses logical before/after version references tied to its persistent session. Evidence files are written once; `evidence_hashes.json` verifies their bytes. `turns/` adds separate judge verdicts. `ticks.json`, `world_history.json`, `report.json`, and `report.txt` support inspection and replay checks. Generated runs are ignored by Git.
+Each `evidence/turn_NNNN.json` contains event IDs, timestamp, disclosed context, observation, Turn-boundary pre/post state, ordered action trace and tool results, response, memory versions/delta, and related opportunities. OpenClaw session memory uses logical before/after version references tied to its persistent session. Evidence files are written once; `evidence_hashes.json` verifies their bytes. `turns/` adds separate judge verdicts. These JSON files are compatibility exports; `world.db` is the authoritative runtime store. `ticks.json`, compact `world_history.json`, `opportunity_history.json`, `report.json`, and `report.txt` support inspection and replay checks. Generated runs are ignored by Git.
+
+### SQLite run journal and Tick checkpoints
+
+Each run has one `world.db`. The `state` table holds current service state. `history` stores operation results, domain changes, and JSON Patches rather than full before/after worlds for each action; `state_at(seq)` reconstructs a historical world from task initial state and patches. `ticks` stores ordered event IDs, timestamp, optional Turn ID, and the completed Tick record. `events` stores each event in execution order. `mcp_actions` stores one row per tool call with `action_id`, and `notifications` stores actual simulated inbox deliveries with `notification_id` and the originating `action_id`. `turns` retains boundary snapshots and response/memory evidence; action and notification lists are read from their own tables when resuming.
+
+`judgments` stores each Tick's task/notification verdict, evidence references, and raw LLM output. Its `input_hash` points to `judge_inputs`, which deduplicates identical Judge inputs. `opportunities` stores current obligation state, deadline, linked notification ID, and final score; `opportunity_history` appends creation, pending, and settlement transitions. The common links are `tick_id`, `event_id`, `turn_id`, `action_id`, `notification_id`, and `opportunity_id`. A completed Tick is committed to SQLite immediately after its Judge and opportunity updates. Required-notification scoring still uses one opportunity as its statistical unit; no tool action receives a separate reward.
+
+[`judge_evidence.py`](src/probench/judge_evidence.py) builds the actual Judge API input as `tick`, ordered `events`, `goal_context`, boundary `world_state`, `world_changes`, `actions`, `current_notifications`, `active_opportunities`, and bounded `relevant_history`. It queries only recorded events and changes through the current simulated time, including on a pure mutation Tick. The task-specific evidence source limits still control previous Turn and world-history records. The Judge prompt and both score formulas are unchanged.
+
+To pause at a completed Tick and continue later with the same run directory:
+
+```bash
+bench run examples/synthetic --agent mock --judge mock --output runs/resume-demo --max-ticks 2
+bench run examples/synthetic --agent mock --judge mock --output runs/resume-demo --resume
+```
+
+Resume verifies frozen evidence, task identity, and the completed timeline, then restores opportunity state from SQLite. OpenClaw resume also requires its original persistent Gateway volume, provider, and model. Recovery from an interruption *inside* a Tick is outside the supported scope.
 
 The Judge gives each **Turn** exactly one task score: harmful/violation `-1` takes priority, then goal progress `+1`, useful new actionable information `+0.5`, otherwise `0`. `R_task = max(0, sum(turn scores) / turn count)`. Individual actions are evidence, never scored separately. The production Judge uses an OpenAI-compatible chat completion endpoint and validates JSON against Pydantic schemas and available evidence references; malformed output fails the run. `MockJudge` is a deterministic test double and cannot validate the quality of LLM judgments.
 
