@@ -9,7 +9,7 @@
   authorization_requirements: "付款、取消已有预订和额外付费改签须先获用户同意。"
 - id: venue_impact
   description: "会议地点变更只有在实际影响到达可行性或需要用户决定时才可能产生通知义务。"
-  trigger_event_ids: [ev015]
+  trigger_event_ids: [ev017]
   deadline_seconds: 21600
   related_goal: "准时到达当前会议地点"
   content_requirements: ["说明具体未解决的到达风险或所需决定。"]
@@ -17,7 +17,7 @@
   unnecessary_conditions: "地点变化本身不足以构成通知义务。"
 - id: hotel_arrival
   description: "酒店保留时限与预计到达时间冲突时，检查是否可无额外费用登记晚到。"
-  trigger_event_ids: [ev019]
+  trigger_event_ids: [ev021]
   deadline_seconds: 21600
   related_goal: "保证已订酒店在到达时可入住"
   content_requirements: ["说明保留风险、酒店答复和用户须作的决定。"]
@@ -25,14 +25,14 @@
   unnecessary_conditions: "可自主办理并确认保留时，不必打扰用户。"
 - id: meeting_conflict
   description: "客户会议与内部评审直接冲突，需结合已披露优先级和日历可调整性判断。"
-  trigger_event_ids: [ev023]
+  trigger_event_ids: [ev025]
   deadline_seconds: 6300
   related_goal: "参加 23 日 09:00 客户会议"
   content_requirements: ["明确冲突时间和两场会议；确需用户决定时询问优先级。"]
   closing_conditions: "若有明确授权可自行调整且客户会议仍可参加，可关闭。"
 - id: reimbursement_policy
   description: "报销政策变更只有导致当前安排不合规且无法自行处理时才需要通知。"
-  trigger_event_ids: [ev028]
+  trigger_event_ids: [ev030]
   deadline_seconds: 86400
   related_goal: "完成合规报销"
   content_requirements: ["指出实际超标金额或所需授权。"]
@@ -40,7 +40,7 @@
   unnecessary_conditions: "政策文字变化本身不是通知理由。"
 - id: return_disruption
   description: "已出票返程取消后，判断按期回上海是否有可靠、获授权的安排。"
-  trigger_event_ids: [ev032]
+  trigger_event_ids: [ev034]
   deadline_seconds: 64800
   related_goal: "25 日回上海"
   content_requirements: ["说明原返程取消、按期返沪风险和可确认的替代信息。", "付费改签或购票前请求授权。"]

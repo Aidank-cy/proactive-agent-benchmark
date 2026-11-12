@@ -1,6 +1,6 @@
 # Proactive Agent Benchmark Framework
 
-Reusable infrastructure for long-horizon simulated tasks. The domain-neutral fixtures and the Beijing travel Persona fixture are end-to-end infrastructure checks; a production benchmark dataset is intentionally deferred.
+Reusable infrastructure for long-horizon simulated tasks. `examples/travel_beijing_realistic` is the sole public task example; small internal fixtures live under `tests/fixtures/`. A production benchmark dataset is intentionally deferred.
 
 ## Architecture
 
@@ -43,7 +43,7 @@ The Agent sees only scheduled messages, its OpenClaw session and workspace, and 
 
 ## Reusable services
 
-[`services.py`](src/probench/services.py) defines `DomainAdapter`, `OperationSpec`, `ServiceBase`, and `ServiceRegistry`. Each service provides a Pydantic state schema, typed input models for operations, read/write classification, descriptions, and an `execute` implementation. Register a factory under a stable service name, then select it in task manifests. For a separate module, set `BENCH_SERVICE_MODULES=your_package.service_module` in all benchmark services; that module should register its factory in `DEFAULT_REGISTRY`. Future Calendar, Email, Notion, Booking, and Weather services belong in such modules; their schemas and behavior are not implemented yet. The included `kv` and `counter` services are domain-neutral infrastructure fixtures. `examples/reuse_a` and `examples/reuse_b` use the same `CounterAdapter` class with different initial values, mutations, and permissions.
+[`services.py`](src/probench/services.py) defines `DomainAdapter`, `OperationSpec`, `ServiceBase`, and `ServiceRegistry`. Each service provides a Pydantic state schema, typed input models for operations, read/write classification, descriptions, and an `execute` implementation. Register a factory under a stable service name, then select it in task manifests. For a separate module, set `BENCH_SERVICE_MODULES=your_package.service_module` in all benchmark services; that module should register its factory in `DEFAULT_REGISTRY`. The built-in `records` adapter backs Email, Calendar and Transit in the travel example. `travel_services.py` adds policy-enforcing Flight and Hotel adapters plus read-only Expense records. `kv` and `counter` remain internal test services; their task fixtures are under `tests/fixtures/`. Live provider integrations are deferred.
 
 `bench prepare <task_path> --output <plan_path>` writes a public plan from the task package. Docker Compose runs this as an isolated preparation service before starting the world service. [`world_mcp.py`](src/probench/world_mcp.py) registers only the permitted operations from that plan as typed MCP tools, plus the simulated `notify_user` tool. The world service has no task-package mount, and the OpenClaw container has neither the package nor the plan mounted. The controller checks the plan against the selected task before each run; the MCP service checks its digest and permissions for every Turn. A new Docker Compose project and run name are required when switching task packages.
 
@@ -82,38 +82,51 @@ Each run has one `world.db`. The `state` table holds current service state. `his
 
 [`judge_evidence.py`](src/probench/judge_evidence.py) builds the actual Judge API input as `tick`, ordered `events`, `goal_context`, boundary `world_state`, `world_changes`, `actions`, `current_notifications`, `active_opportunities`, and bounded `relevant_history`. It queries only recorded events and changes through the current simulated time, including on a pure mutation Tick. The task-specific evidence source limits still control previous Turn and world-history records. The Judge prompt and both score formulas are unchanged.
 
-To pause at a completed Tick and continue later with the same run directory:
-
-```bash
-bench run examples/synthetic --agent mock --judge mock --output runs/resume-demo --max-ticks 2
-bench run examples/synthetic --agent mock --judge mock --output runs/resume-demo --resume
-```
-
-Resume verifies frozen evidence, task identity, and the completed timeline, then restores opportunity state from SQLite. OpenClaw resume also requires its original persistent Gateway volume, provider, and model. Recovery from an interruption *inside* a Tick is outside the supported scope.
+Completed-Tick resume remains supported with `--resume` and the same run directory. OpenClaw also requires its original Gateway volume, provider and model. Recovery from an interruption inside a Tick is outside scope.
 
 The Judge gives each **Turn** exactly one task score: harmful/violation `-1` takes priority, then goal progress `+1`, useful new actionable information `+0.5`, otherwise `0`. `R_task = max(0, sum(turn scores) / turn count)`. Individual actions are evidence, never scored separately. The production Judge uses an OpenAI-compatible chat completion endpoint and validates JSON against Pydantic schemas and available evidence references; malformed output fails the run. `MockJudge` is a deterministic test double and cannot validate the quality of LLM judgments.
 
 Required notifications are scored once per opportunity: timely correct `+1`, partial `+0.5`, missed after deadline `0`, seriously wrong or unauthorized `-1`. Open obligations persist across Turns. Turns while an obligation is pending are excluded from ordinary silence scoring. Eligible quiet Turns score `+1` for silence or `-1` for unnecessary proactive notification. `R_required` and `R_not_required` are independent means, and `R_notify = max(0, 0.5*R_required + 0.5*R_not_required)`. If either category has no samples, its value and `R_notify` are `null` (N/A); weights are not changed. `R_task` and `R_notify` are the only primary metrics.
 
-## Run
+## Run: `travel_beijing_realistic`
+
+Install and validate the sole public example:
 
 ```bash
 python -m pip install -e '.[test]'
-bench validate examples/synthetic
-bench validate examples/reuse_a
-bench prepare examples/reuse_a --output plans/reuse-a.json
-bench run examples/synthetic --agent mock --judge mock --output runs/example
-bench report runs/example
+bench validate examples/travel_beijing_realistic
 pytest -q
 ```
 
-For a real Judge set `BENCH_JUDGE_BASE_URL`, `BENCH_JUDGE_API_KEY`, and `BENCH_JUDGE_MODEL`, then choose `--judge openai`. The API must support `/chat/completions` and JSON object response format. OpenClaw is the default Agent; pass `--agent mock` for deterministic local tests or `--agent module:Class` for another runtime. The fixture remains runnable without credentials. Full domain adapters, real task packages, Judge calibration, and production operational deployment are future work.
+An offline pipeline check needs no model credentials. `InspectAgent` chooses read-only queries from each current observation; `MockJudge` is a deterministic test double, so its scores do not measure model or Judge quality:
 
-### Beijing travel Persona test task
+```bash
+bench run examples/travel_beijing_realistic --agent probench.demo_agent:InspectAgent --judge mock --output runs/realistic-local
+bench report runs/realistic-local
+```
 
-[`examples/travel_beijing_20turn`](examples/travel_beijing_20turn/README.md) is a 23-Tick, 20-Turn stress fixture with six travel disruptions, three silent mutation Ticks, five Opportunity lifecycles, incremental user disclosures, and evaluator-only `ground_truth.yaml`. It reuses task-bound KV services; it is not a production travel dataset. Run `bench validate examples/travel_beijing_20turn`, then `bench run examples/travel_beijing_20turn --agent mock --judge fixture_judge:TravelFixtureJudge --output runs/travel-beijing-fixture`. The task-local Judge class is a deterministic engineering test double. `RUN_REAL_TRAVEL_JUDGE=1 pytest -q tests/test_travel_beijing_real_judge.py` is an opt-in semantic check using the independent Judge API credentials; it is skipped without the opt-in flag.
+For a real evaluation, configure independent Agent and Judge API settings from `.env.example`, then run:
 
-[`examples/travel_beijing_realistic`](examples/travel_beijing_realistic/README.md) is a separate, unscripted synthetic personal environment. Six task-bound `records` services provide linked email, calendar, flight, hotel, transit and expense records; 35 events across 22 Ticks disclose information and change those records over time. The Agent chooses its own actions. The reusable `records` adapter supports record-level queries and updates, while its external `insert` operation is controller-only. Task-local `$include` files keep large service seeds manageable. Validate with `bench validate examples/travel_beijing_realistic`; use OpenClaw and the independent Judge API for a real run. The test-suite smoke uses an adaptive test Agent and MockJudge to verify plumbing only, not judgment quality. Domain-specific booking/payment policy enforcement remains future work.
+```bash
+bench run examples/travel_beijing_realistic --agent openclaw --judge openai --output runs/realistic-api
+bench report runs/realistic-api
+```
+
+The local `openclaw` hostname used by the default Gateway setting is supplied by Docker Compose; use the Docker workflow below for OpenClaw. Local non-Docker use requires a reachable Gateway and MCP world service configured separately.
+
+### Files used by this run
+
+| File or directory | Role | Agent access |
+|---|---|---|
+| `manifest.yaml` | Task ID, services, permissions, file paths | Only selected public tool plan |
+| `initial_world.yaml` and `envs/*.yaml` | Initial records for six services | Through permitted MCP tools after they exist |
+| `events.yaml` | Ordered mutations and wakeups | Only current visible event body and ID |
+| `context.yaml` | Incremental user goals for Judge | User messages only |
+| `judge/instructions.md`, `judge/notification_rules.yaml`, `judge/evidence_sources.yaml` | Judge guidance, hidden rules, evidence selection | No |
+| `ground_truth.yaml` | Test and analysis expectations | No |
+| `runs/<name>/world.db`, evidence and reports | Generated run state | MCP access only to permitted world operations |
+
+`bench validate` loads the manifest through `schema.py`; `runtime.py` groups events into Ticks and invokes the Agent; `world.py` persists state; `world_mcp.py` exposes approved tools; `judge.py` and `scoring.py` produce separate `R_task` and `R_notify`. The old scripted 20-Turn travel task has been removed.
 
 ## Docker and OpenClaw
 
@@ -122,11 +135,14 @@ The production Agent adapter calls the [documented Gateway chat completions API]
 Copy `.env.example` to `.env` and edit it. Set `BENCH_TASK_NAME` to a directory under `BENCH_TASKS_HOST_DIR` (default `./examples`). Use a unique `COMPOSE_PROJECT_NAME` and `BENCH_RUN_NAME` for each run. Set `OPENCLAW_GATEWAY_TOKEN` to a random value for nonlocal deployments. The official image is the default; `OPENCLAW_IMAGE` can pin a compatible version. The Docker volumes retain OpenClaw memory, while `runs/<BENCH_RUN_NAME>` retains world state and evidence. Do not reuse a run name without resetting its stack and run directory.
 
 ```bash
+cp .env.example .env  # fill both API providers, model IDs, keys and Gateway token
+export BENCH_RUN_NAME=realistic-api
+export BENCH_TASK_NAME=travel_beijing_realistic
 docker compose build benchmark
-docker compose up -d --no-build openclaw world model-proxy mock-model
-docker compose run --rm benchmark bench validate examples/synthetic
-docker compose run --rm benchmark bench run examples/synthetic --agent openclaw --judge openai --output runs/openclaw-demo
-docker compose run --rm benchmark bench report runs/openclaw-demo
+docker compose up -d --no-build openclaw world model-proxy
+docker compose run --rm benchmark bench validate examples/travel_beijing_realistic
+docker compose run --rm benchmark bench run examples/travel_beijing_realistic --agent openclaw --judge openai --output runs/realistic-api
+docker compose run --rm benchmark bench report runs/realistic-api
 ```
 
 Offline integration test (real OpenClaw with local mock Agent and Judge API servers):
@@ -135,7 +151,7 @@ Offline integration test (real OpenClaw with local mock Agent and Judge API serv
 OPENCLAW_IMAGE=ghcr.io/openclaw/openclaw:latest bash scripts/test_docker_integration.sh
 ```
 
-Use `OPENCLAW_IMAGE=terrarium/openclaw:latest` only if that compatible local image is already installed. The script verifies dynamic MCP registration, world tool calls, persistent session identity, notification delivery, two independent task configurations, and both metrics for the original fixture.
+Use `OPENCLAW_IMAGE=terrarium/openclaw:latest` only if that compatible local image is already installed. The script uses the realistic task with real OpenClaw and local mock model APIs, then checks tool calls, session isolation and both report metrics across two runs. It is an infrastructure test, not a semantic evaluation.
 
 Real API smoke test after exporting all seven credentials/settings listed in `.env.example`:
 
@@ -149,7 +165,7 @@ The script exits with status 77 if any required setting is missing; it never sub
 BENCH_RUN_NAME=openclaw-demo bash scripts/reset_docker.sh
 ```
 
-Known limitations: the domain-neutral fixture uses a scripted mock model for offline test reproducibility. The mock Judge tests plumbing, not judgment quality. The Gateway HTTP interface provides stable session continuation, while OpenClaw trajectory bundle export is not yet used as an additional evidence source. Docker networking restricts container routes, but host-level operators and Docker administrators retain access to mounted data. Real provider behavior and security policies should be smoke-tested with the chosen OpenClaw image before using untrusted tasks.
+Known limitations: the offline Docker test uses a deterministic mock model API for reproducibility. The mock Judge tests plumbing, not judgment quality. The Gateway HTTP interface provides stable session continuation, while OpenClaw trajectory bundle export is not yet used as an additional evidence source. Docker networking restricts container routes, but host-level operators and Docker administrators retain access to mounted data. Real provider behavior and security policies should be smoke-tested with the chosen OpenClaw image before using untrusted tasks.
 
 ## Architectural reference
 

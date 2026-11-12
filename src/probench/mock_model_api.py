@@ -28,9 +28,20 @@ def _agent_reply(body):
     match = re.search(r"Benchmark Turn (\d+)", user)
     turn = int(match.group(1)) if match else 0
     has_tool_result = any(x.get("role") == "tool" for x in messages[idx + 1:])
-    if has_tool_result or turn == 4:
+    realistic = "travel_beijing_realistic" in user
+    if has_tool_result or (turn == 4 and not realistic):
         return {"role": "assistant", "content": f"Synthetic Turn {turn} complete."}, "stop"
-    if "synthetic_counter_a" in user:
+    if realistic:
+        if any(word in user for word in ("航班", "机票", "出差", "旅行部")):
+            name = "world__flight_list"
+        elif "酒店" in user:
+            name = "world__hotel_list"
+        elif any(word in user for word in ("日历", "会议")):
+            name = "world__calendar_list"
+        else:
+            name = "world__email_list"
+        calls = {turn: (name, {})}
+    elif "synthetic_counter_a" in user:
         calls = {1: ("world__counter_read", {}), 2: ("world__counter_increment", {"amount": 2})}
     elif "synthetic_counter_b" in user:
         calls = {1: ("world__counter_read", {}), 2: ("world__counter_read", {})}

@@ -13,7 +13,7 @@ if [[ "${AGENT_API_BASE_URL}" == *mock-model* || "${BENCH_JUDGE_BASE_URL}" == *m
 fi
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-probench-real}"
 export BENCH_RUN_NAME="${BENCH_RUN_NAME:-openclaw-real}"
-export BENCH_TASK_NAME="${BENCH_TASK_NAME:-synthetic}"
+export BENCH_TASK_NAME="${BENCH_TASK_NAME:-travel_beijing_realistic}"
 docker compose build benchmark
 docker compose up -d --no-build openclaw world model-proxy
 docker compose run --rm benchmark bench run "examples/${BENCH_TASK_NAME}" --agent openclaw --judge openai --output "runs/${BENCH_RUN_NAME}"

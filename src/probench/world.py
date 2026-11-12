@@ -100,7 +100,11 @@ class SQLiteWorld:
             self.conn.execute("BEGIN IMMEDIATE")
             before = self.snapshot().get(adapter, {})
             state = copy.deepcopy(before)
-            result, changes = self.adapters[adapter].execute(state, operation, arguments, mutate=mutate)
+            service = self.adapters[adapter]
+            if hasattr(service, "execute_at"):
+                result, changes = service.execute_at(state, operation, arguments, mutate=mutate, timestamp=timestamp)
+            else:
+                result, changes = service.execute(state, operation, arguments, mutate=mutate)
             if mutate:
                 state = self.adapters[adapter].validate_state(state)
                 self.conn.execute("INSERT OR REPLACE INTO state VALUES (?,?)", (adapter, json.dumps(state)))

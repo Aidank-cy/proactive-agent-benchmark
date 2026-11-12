@@ -6,18 +6,18 @@ duration_seconds: 777600
 services:
   - {id: email, service: records}
   - {id: calendar, service: records}
-  - {id: flight, service: records}
-  - {id: hotel, service: records}
+  - {id: flight, service: flight_booking}
+  - {id: hotel, service: hotel_booking}
   - {id: transit, service: records}
-  - {id: expenses, service: records}
+  - {id: expenses, service: expense_records}
 workspace_files: {}
 tool_permissions:
   email: [list, search, get, patch, create]
   calendar: [list, search, get, patch, create]
-  flight: [list, search, get, patch, create]
-  hotel: [list, search, get, patch]
+  flight: [list, search, get, issue_ticket]
+  hotel: [list, search, get, register_late_arrival]
   transit: [list, search, get]
-  expenses: [list, search, get, patch, create]
+  expenses: [list, search, get]
 judge:
   completion_policy: expire
 initial_world: initial_world.yaml

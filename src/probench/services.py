@@ -245,6 +245,8 @@ DEFAULT_REGISTRY.register("records", RecordAdapter)
 
 def load_service_modules():
     """Import optional modules that register factories in DEFAULT_REGISTRY."""
+    # Built-in policy services register lazily to avoid a module import cycle.
+    importlib.import_module("probench.travel_services")
     for module in os.environ.get("BENCH_SERVICE_MODULES", "").split(","):
         if module.strip():
             importlib.import_module(module.strip())

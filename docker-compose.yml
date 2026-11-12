@@ -3,7 +3,7 @@ services:
     image: probench:local
     command: ["sh", "-lc", "bench prepare examples/$${BENCH_TASK_NAME} --output /app/plans/$${BENCH_RUN_NAME}.json"]
     environment:
-      BENCH_TASK_NAME: ${BENCH_TASK_NAME:-synthetic}
+      BENCH_TASK_NAME: ${BENCH_TASK_NAME:-travel_beijing_realistic}
       BENCH_RUN_NAME: ${BENCH_RUN_NAME:-openclaw-demo}
       PYTHONPATH: /app/src
       BENCH_SERVICE_MODULES: ${BENCH_SERVICE_MODULES:-}

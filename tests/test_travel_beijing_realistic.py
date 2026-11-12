@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from probench.judge import MockJudge
+from probench.demo_agent import InspectAgent
 from probench.runtime import run, verify_evidence
 from probench.schema import load_task
 from probench.service_plan import write_plan
@@ -21,16 +22,16 @@ TASK = Path(__file__).resolve().parents[1] / "examples" / "travel_beijing_realis
 def test_task_shape_and_progressive_context():
     task = load_task(TASK)
     assert {name: len(records) for name, records in task.initial_world.items()} == {
-        "email": 16, "calendar": 11, "flight": 8, "hotel": 6, "transit": 8, "expenses": 8,
+        "email": 16, "calendar": 11, "flight": 9, "hotel": 6, "transit": 8, "expenses": 8,
     }
-    assert Counter(e.kind for e in task.events) == {"world_mutation": 21, "user_message": 5, "notification": 9}
-    assert len({e.at for e in task.events}) == 22
-    assert len({e.at for e in task.events if e.kind in {"user_message", "notification"}}) == 14
+    assert Counter(e.kind for e in task.events) == {"world_mutation": 22, "user_message": 6, "notification": 9}
+    assert len({e.at for e in task.events}) == 23
+    assert len({e.at for e in task.events if e.kind in {"user_message", "notification"}}) == 15
     assert "4800" not in json.dumps(task.goal_context({"ev001"}), ensure_ascii=False)
     assert "付款" not in json.dumps(task.goal_context({"ev001", "ev003"}), ensure_ascii=False)
     assert "4800" in json.dumps(task.goal_context({"ev001", "ev003"}), ensure_ascii=False)
     assert "停止代为索取" not in json.dumps(task.goal_context({"ev001", "ev003", "ev007"}), ensure_ascii=False)
-    assert "停止代为索取" in json.dumps(task.goal_context({"ev001", "ev003", "ev007", "ev031"}), ensure_ascii=False)
+    assert "停止代为索取" in json.dumps(task.goal_context({"ev001", "ev003", "ev007", "ev033"}), ensure_ascii=False)
     assert not (TASK / "mock_agent.json").exists()
 
 
@@ -88,27 +89,11 @@ def test_agent_surface_has_no_evaluation_labels(tmp_path):
             assert any(source in event.body for source in ("邮件", "航班", "日历", "酒店", "地图", "访客"))
 
 
-class AdaptiveInspectAgent:
-    """Non-script test agent: selects queries from each actual observation, not Turn number."""
-
-    def run_turn(self, observation, tools, history):
-        message = " ".join(item["body"] for item in observation["messages"])
-        if "航班" in message or "旅行" in message or "出差" in message:
-            tools.call("flight", "list")
-        elif "酒店" in message:
-            tools.call("hotel", "list")
-        elif "日历" in message or "会议" in message:
-            tools.call("calendar", "list")
-        else:
-            tools.call("email", "list")
-        return {"text": "已查看当前资料。", "proactive_notifications": []}
-
-
 def test_unscripted_agent_pipeline_smoke(tmp_path):
     task = load_task(TASK)
-    result = run(task, AdaptiveInspectAgent(), MockJudge(), tmp_path / "run")
+    result = run(task, InspectAgent(), MockJudge(), tmp_path / "run")
     assert set(("R_task", "R_notify")) <= result.keys()
-    assert result["total_agent_turns"] == 14
+    assert result["total_agent_turns"] == 15
     assert verify_evidence(tmp_path / "run")
     evidence = json.loads((tmp_path / "run" / "evidence" / "turn_0001.json").read_text())
     assert evidence["agent_observation"]["messages"][0]["event_id"] == "ev001"

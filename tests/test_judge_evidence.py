@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def fixture_run(tmp_path):
-    task = load_task(ROOT / "examples/synthetic")
+    task = load_task(ROOT / "tests/fixtures/synthetic")
     script = json.loads((task.root / "mock_agent.json").read_text())
     folder = tmp_path / "run"
     run(task, MockAgent(script), MockJudge(), folder)
@@ -105,7 +105,7 @@ def test_optional_evidence_is_selected_and_goal_changes_follow_event_order(tmp_p
 
 def test_task_judge_files_are_confined_and_legacy_defaults(tmp_path):
     root = tmp_path / "task"
-    shutil.copytree(ROOT / "examples/synthetic", root)
+    shutil.copytree(ROOT / "tests/fixtures/synthetic", root)
     manifest_path = root / "manifest.yaml"
     manifest = yaml.safe_load(manifest_path.read_text())
     manifest["judge_instructions"] = "context.yaml"
@@ -121,7 +121,7 @@ def test_task_judge_files_are_confined_and_legacy_defaults(tmp_path):
 
 
 def test_updated_goal_can_make_candidate_event_irrelevant(tmp_path):
-    task = load_task(ROOT / "examples/synthetic")
+    task = load_task(ROOT / "tests/fixtures/synthetic")
     task.events.insert(3, Event(id="user_cancel", at="2026-01-01T00:01:00+00:00", kind="user_message", body="Stop monitoring the item."))
     task.context.append(ContextDisclosure(event_id="user_cancel", goals=["Monitoring cancelled."], interaction="User cancelled the earlier goal."))
     script = json.loads((task.root / "mock_agent.json").read_text())
@@ -145,7 +145,7 @@ def test_updated_goal_can_make_candidate_event_irrelevant(tmp_path):
 
 
 def test_state_condition_can_create_one_cross_turn_obligation(tmp_path):
-    task = load_task(ROOT / "examples/synthetic")
+    task = load_task(ROOT / "tests/fixtures/synthetic")
     task.rules[0].trigger_event_ids = []
     script = json.loads((task.root / "mock_agent.json").read_text())
 

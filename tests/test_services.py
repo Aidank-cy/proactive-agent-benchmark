@@ -18,7 +18,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def _task(name):
-    path = ROOT / "examples" / name
+    path = ROOT / "tests" / "fixtures" / name
     return load_task(path), json.loads((path / "mock_agent.json").read_text())
 
 
@@ -76,7 +76,7 @@ def test_registry_rejects_duplicate_and_invalid_state(tmp_path):
 
 
 def test_task_can_bind_multiple_services_without_new_service_code(tmp_path):
-    source = ROOT / "examples/reuse_a"
+    source = ROOT / "tests/fixtures/reuse_a"
     target = tmp_path / "combined"
     shutil.copytree(source, target)
     manifest = yaml.safe_load((target / "manifest.yaml").read_text())

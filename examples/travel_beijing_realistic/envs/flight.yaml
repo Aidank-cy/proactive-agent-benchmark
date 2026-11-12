@@ -1,3 +1,11 @@
+travel_account:
+  id: travel_account
+  kind: payment_account
+  owner: "华辰科技（上海）有限公司差旅中心"
+  currency: CNY
+  available_balance_cny: 10000
+  status: active
+  note: "企业差旅账户可用额；新支出仍须依据具体授权和报价办理。"
 air_order_261116_37:
   id: air_order_261116_37
   kind: booking

@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def fixture():
-    task = load_task(ROOT / "examples/synthetic")
+    task = load_task(ROOT / "tests/fixtures/synthetic")
     script = json.loads((task.root / "mock_agent.json").read_text())
     return task, script
 
